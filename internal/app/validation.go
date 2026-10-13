@@ -114,10 +114,6 @@ func isValidGithubImageURL(rawURL string) bool {
 		return false
 	}
 
-	if !strings.HasPrefix(normalized, "https://raw.githubusercontent.com/") {
-		return false
-	}
-
 	lower := strings.ToLower(normalized)
 	allowedExts := []string{".png", ".jpg", ".jpeg", ".gif", ".webp"}
 	for _, ext := range allowedExts {
@@ -228,4 +224,194 @@ func isAlnum(b byte) bool {
 		(b >= 'A' && b <= 'Z') ||
 		(b >= '0' && b <= '9') ||
 		b >= 0x80 // UTF-8 continuation / Türkçe karakter başlangıcı
+}
+
+// validateProfileInput — kullanıcı profil güncellemesi için username + bio validasyonu.
+// Saf (pure) — handler'dan bağımsız, test edilebilir.
+// Hata durumunda error code string'i döner (örn. "username_reserved").
+//
+// Dönüş: (temizlenmiş username, temizlenmiş bio, hata)
+func validateProfileInput(username, bio string) (string, string, error) {
+	username = sanitizeText(strings.TrimSpace(username))
+	bio = sanitizeText(strings.TrimSpace(bio))
+
+	if username == "" {
+		return "", "", fmt.Errorf("username_empty")
+	}
+
+	// `user_` prefix reserved — geçici onboarding isimleri ile çakışmasın
+	if strings.HasPrefix(strings.ToLower(username), "user_") {
+		return "", "", fmt.Errorf("username_reserved")
+	}
+
+	// Rezerve isim listesi
+	if ReservedUsernames[strings.ToLower(username)] {
+		return "", "", fmt.Errorf("username_reserved")
+	}
+
+	// Format — baş/son noktalama + arka arkaya tekrar
+	if !isValidUsernameFormat(username) {
+		return "", "", fmt.Errorf("username_invalid_format")
+	}
+
+	if err := validateTextMinMax("username", username, MinUsernameLen, MaxUsernameLen, UsernameRegex, true); err != nil {
+		return "", "", err
+	}
+	if err := validateText("bio", bio, MaxBioLen, BioRegex); err != nil {
+		return "", "", err
+	}
+
+	return username, bio, nil
+}
+
+// validateSearchQuery — kullanıcı araması için sorgu validasyonu + LIKE escape.
+// Boş sorgu geçerlidir, boş string döner (nil hata).
+//
+// Dönüş: (escape edilmiş sorgu, hata)
+func validateSearchQuery(query string) (string, error) {
+	query = strings.TrimSpace(query)
+
+	if query == "" {
+		return "", nil
+	}
+
+	if err := validateText("search", query, MaxSearchLen, UsernameRegex); err != nil {
+		return "", err
+	}
+
+	return escapeLikePattern(query), nil
+}
+
+// escapeLikePattern — PostgreSQL LIKE için %, _, \ kaçışı.
+// Sıra önemli: önce \ (escape karakteri), sonra % ve _.
+func escapeLikePattern(s string) string {
+	s = strings.ReplaceAll(s, "\\", "\\\\")
+	s = strings.ReplaceAll(s, "%", "\\%")
+	s = strings.ReplaceAll(s, "_", "\\_")
+	return s
+}
+
+// validateUsernameParam — URL path parametresi olarak gelen username'i doğrular.
+//
+// Kullanıcının DB'de var olduğunu kontrol etmez (o handler'ın işi).
+// Sadece giriş formatını doğrular: boş değil, makul uzunlukta, geçerli karakter.
+//
+// Reserved/profanity kontrolü YAPMAZ — bu endpoint kayıtlı kullanıcıyı
+// getirmek için kullanılır; eski/uzun kayıtlar sorun çıkarmasın.
+func validateUsernameParam(username string) error {
+	if username == "" {
+		return fmt.Errorf("username_required")
+	}
+
+	if utf8.RuneCountInString(username) > MaxUsernameLen {
+		return fmt.Errorf("username_too_long")
+	}
+
+	if !UsernameRegex.MatchString(username) {
+		return fmt.Errorf("username_invalid_char")
+	}
+
+	return nil
+}
+
+// ─────────────────────────────────────────────────────────
+// PROJECT VALIDATION
+// ─────────────────────────────────────────────────────────
+
+// ProjectInput — create/update handler'larının ortak girdisi.
+type ProjectInput struct {
+	Title           string `json:"title"`
+	Description     string `json:"description"`
+	LongDescription string `json:"longDescription"`
+	GithubURL       string `json:"githubUrl"`
+	DemoURL         string `json:"demoUrl"`
+	ImageURL        string `json:"imageUrl"`
+	CategoryIDs     []int  `json:"categoryIds"`
+	MaxContributors int    `json:"maxContributors"`
+}
+
+// validateProjectInput — proje create/update için saf validasyon + normalizasyon.
+//
+// Sadece format/uzunluk/içerik doğrular. Şunları YAPMAZ:
+//   - GitHub repo public kontrolü (HTTP) → handler'da: checkGithubRepoPublic
+//   - Görsel boyut kontrolü (HTTP) → handler'da: checkGithubImageSize
+//   - Kategori ID geçerliliği (DB) → handler'da: validateCategoryIDs
+//
+// isCreate=true  → MaxContributors boşsa default ata, izinli listede mi kontrol et
+// isCreate=false → MaxContributors yok sayılır (edit'te değişmez)
+//
+// Dönüş: sanitize + normalize edilmiş ProjectInput + error
+func validateProjectInput(input ProjectInput, isCreate bool) (ProjectInput, error) {
+	if input.Title == "" || input.Description == "" {
+		return input, fmt.Errorf("title_and_description_required")
+	}
+
+	if isCreate {
+		if input.MaxContributors == 0 {
+			input.MaxContributors = DefaultContributorLimit
+		}
+		if !isAllowedContributorLimit(input.MaxContributors) {
+			return input, fmt.Errorf("invalid_contributor_limit")
+		}
+	}
+
+	// Sanitize
+	input.Title = sanitizeText(input.Title)
+	input.Description = sanitizeText(input.Description)
+	input.LongDescription = sanitizeText(input.LongDescription)
+
+	// Metin validasyonları (min + max + regex + profanity)
+	if err := validateTextMinMax("title", input.Title, MinTitleLen, MaxTitleLen, TitleRegex, true); err != nil {
+		return input, err
+	}
+	if err := validateTextMinMax("description", input.Description, MinDescriptionLen, MaxDescriptionLen, TextRegex, true); err != nil {
+		return input, err
+	}
+	if err := validateTextMinMax("longDescription", input.LongDescription, 0, MaxLongDescLen, TextRegex, false); err != nil {
+		return input, err
+	}
+
+	// URL uzunlukları
+	if utf8.RuneCountInString(input.GithubURL) > MaxGithubURLLen {
+		return input, fmt.Errorf("github_url_too_long")
+	}
+	if utf8.RuneCountInString(input.DemoURL) > MaxDemoURLLen {
+		return input, fmt.Errorf("demo_url_too_long")
+	}
+	if utf8.RuneCountInString(input.ImageURL) > MaxImageURLLen {
+		return input, fmt.Errorf("image_url_too_long")
+	}
+
+	// GitHub URL zorunlu + normalize
+	if strings.TrimSpace(input.GithubURL) == "" {
+		return input, fmt.Errorf("github_url_required")
+	}
+	normalizedRepo := normalizeGithubRepoURL(input.GithubURL)
+	if normalizedRepo == "" {
+		return input, fmt.Errorf("invalid_github_url")
+	}
+	input.GithubURL = normalizedRepo
+
+	// Demo URL
+	if input.DemoURL != "" &&
+		!strings.HasPrefix(input.DemoURL, "http://") &&
+		!strings.HasPrefix(input.DemoURL, "https://") {
+		return input, fmt.Errorf("invalid_demo_url")
+	}
+
+	// Image URL
+	if input.ImageURL != "" {
+		normalized := normalizeGithubImageURL(input.ImageURL)
+		if normalized == "" || !isValidGithubImageURL(normalized) {
+			return input, fmt.Errorf("image_url_must_be_github")
+		}
+		input.ImageURL = normalized
+	}
+
+	// Kategori sayısı
+	if len(input.CategoryIDs) > MaxCategories {
+		return input, fmt.Errorf("too_many_categories")
+	}
+
+	return input, nil
 }

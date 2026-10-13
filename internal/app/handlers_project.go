@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gin-gonic/gin"
 )
@@ -321,108 +320,34 @@ func handleCreateProject(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	ctx := c.Request.Context()
 
-	var input struct {
-		Title           string `json:"title"`
-		Description     string `json:"description"`
-		LongDescription string `json:"longDescription"`
-		GithubURL       string `json:"githubUrl"`
-		DemoURL         string `json:"demoUrl"`
-		ImageURL        string `json:"imageUrl"`
-		CategoryIDs     []int  `json:"categoryIds"`
-		MaxContributors int    `json:"maxContributors"` // [YENİ]
-	}
-
+	var input ProjectInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_data"})
 		return
 	}
 
-	if input.Title == "" || input.Description == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title_and_description_required"})
-		return
-	}
-
-	// [YENİ] Katkıcı limiti validasyonu
-	if input.MaxContributors == 0 {
-		input.MaxContributors = DefaultContributorLimit
-	}
-	if !isAllowedContributorLimit(input.MaxContributors) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_contributor_limit"})
-		return
-	}
-
-	// Sanitize
-	input.Title = sanitizeText(input.Title)
-	input.Description = sanitizeText(input.Description)
-	input.LongDescription = sanitizeText(input.LongDescription)
-
-	// Metin validasyonları
-	if err := validateTextMinMax("title", input.Title, MinTitleLen, MaxTitleLen, TitleRegex, true); err != nil {
+	cleaned, err := validateProjectInput(input, true)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validateTextMinMax("description", input.Description, MinDescriptionLen, MaxDescriptionLen, TextRegex, true); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := validateTextMinMax("longDescription", input.LongDescription, 0, MaxLongDescLen, TextRegex, false); err != nil {
+	input = cleaned
+
+	// HTTP: GitHub repo public mi?
+	if err := checkGithubRepoPublic(input.GithubURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// URL kontrolleri
-	if utf8.RuneCountInString(input.GithubURL) > MaxGithubURLLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "github_url_too_long"})
-		return
-	}
-	if utf8.RuneCountInString(input.DemoURL) > MaxDemoURLLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "demo_url_too_long"})
-		return
-	}
-	if utf8.RuneCountInString(input.ImageURL) > MaxImageURLLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image_url_too_long"})
-		return
-	}
-
-	// GitHub URL zorunlu + public olmalı
-	if input.GithubURL == "" || strings.TrimSpace(input.GithubURL) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "github_url_required"})
-		return
-	}
-	normalizedRepo := normalizeGithubRepoURL(input.GithubURL)
-	if normalizedRepo == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_github_url"})
-		return
-	}
-	if err := checkGithubRepoPublic(normalizedRepo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	input.GithubURL = normalizedRepo
-	if input.DemoURL != "" &&
-		!strings.HasPrefix(input.DemoURL, "http://") &&
-		!strings.HasPrefix(input.DemoURL, "https://") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_demo_url"})
-		return
-	}
+	// HTTP: Görsel boyutu
 	if input.ImageURL != "" {
-		normalized := normalizeGithubImageURL(input.ImageURL)
-		if normalized == "" || !isValidGithubImageURL(normalized) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "image_url_must_be_github"})
-			return
-		}
-		if err := checkGithubImageSize(normalized); err != nil {
+		if err := checkGithubImageSize(input.ImageURL); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		input.ImageURL = normalized
 	}
 
-	if len(input.CategoryIDs) > MaxCategories {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "too_many_categories"})
-		return
-	}
-
+	// DB: Kategori ID'leri geçerli mi?
 	if !validateCategoryIDs(ctx, input.CategoryIDs) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_category_id"})
 		return
@@ -698,94 +623,34 @@ func handleUpdateProject(c *gin.Context) {
 		return
 	}
 
-	var input struct {
-		Title           string `json:"title"`
-		Description     string `json:"description"`
-		LongDescription string `json:"longDescription"`
-		GithubURL       string `json:"githubUrl"`
-		DemoURL         string `json:"demoUrl"`
-		ImageURL        string `json:"imageUrl"`
-		CategoryIDs     []int  `json:"categoryIds"`
-	}
-
+	var input ProjectInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_data"})
 		return
 	}
 
-	if input.Title == "" || input.Description == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "title_and_description_required"})
-		return
-	}
-
-	input.Title = sanitizeText(input.Title)
-	input.Description = sanitizeText(input.Description)
-	input.LongDescription = sanitizeText(input.LongDescription)
-
-	// Metin validasyonları (min + max + regex)
-	if err := validateTextMinMax("title", input.Title, MinTitleLen, MaxTitleLen, TitleRegex, true); err != nil {
+	cleaned, err := validateProjectInput(input, false)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validateTextMinMax("description", input.Description, MinDescriptionLen, MaxDescriptionLen, TextRegex, true); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if err := validateTextMinMax("longDescription", input.LongDescription, 0, MaxLongDescLen, TextRegex, false); err != nil {
+	input = cleaned
+
+	// HTTP: GitHub repo public mi?
+	if err := checkGithubRepoPublic(input.GithubURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if utf8.RuneCountInString(input.GithubURL) > MaxGithubURLLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "github_url_too_long"})
-		return
-	}
-	if utf8.RuneCountInString(input.DemoURL) > MaxDemoURLLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "demo_url_too_long"})
-		return
-	}
-	if utf8.RuneCountInString(input.ImageURL) > MaxImageURLLen {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "image_url_too_long"})
-		return
-	}
-
-	// GitHub URL zorunlu + public olmalı
-	if input.GithubURL == "" || strings.TrimSpace(input.GithubURL) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "github_url_required"})
-		return
-	}
-	normalizedRepo := normalizeGithubRepoURL(input.GithubURL)
-	if normalizedRepo == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_github_url"})
-		return
-	}
-	if err := checkGithubRepoPublic(normalizedRepo); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	input.GithubURL = normalizedRepo
-	if input.DemoURL != "" && !strings.HasPrefix(input.DemoURL, "http") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_demo_url"})
-		return
-	}
+	// HTTP: Görsel boyutu
 	if input.ImageURL != "" {
-		normalized := normalizeGithubImageURL(input.ImageURL)
-		if normalized == "" || !isValidGithubImageURL(normalized) {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "image_url_must_be_github"})
-			return
-		}
-		if err := checkGithubImageSize(normalized); err != nil {
+		if err := checkGithubImageSize(input.ImageURL); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-		input.ImageURL = normalized
 	}
 
-	if len(input.CategoryIDs) > MaxCategories {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "too_many_categories"})
-		return
-	}
-
+	// DB: Kategori ID'leri geçerli mi?
 	if !validateCategoryIDs(ctx, input.CategoryIDs) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_category_id"})
 		return

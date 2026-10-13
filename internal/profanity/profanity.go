@@ -100,9 +100,9 @@ func normalize(s string) string {
 	replacer := strings.NewReplacer(
 		// Türkçe karakterler
 		"ı", "i", "ş", "s", "ğ", "g", "ç", "c", "ö", "o", "ü", "u",
-		// Leet-speak → harf
+		// Leet-speak → harf (! ve | hariç — günlük kullanımda yaygın)
 		"@", "a", "4", "a",
-		"1", "i", "!", "i", "|", "i",
+		"1", "i",
 		"0", "o",
 		"3", "e",
 		"5", "s", "$", "s",

@@ -1,6 +1,6 @@
 include .env
 export
-.PHONY: help up down logs logs-t logs-cf logs-cf-t logs-all logs-all-t logs-errors logs-500 logs-4xx logs-important logs-rate logs-auth logs-forbidden logs-filter restart rebuild run build test lint tidy clean check migrate-up migrate-down migrate-version migrate-new migrate-force
+.PHONY: help up down logs logs-t logs-cf logs-cf-t logs-all logs-all-t logs-errors logs-500 logs-4xx logs-important logs-rate logs-auth logs-forbidden logs-filter restart rebuild run build test cover lint tidy clean check migrate-up migrate-down migrate-version migrate-new migrate-force
 
 help:
 	@echo "RepoReef Backend — Komutlar:"
@@ -35,6 +35,7 @@ help:
 	@echo "  check          build + vet + lint (+ test)"
 	@echo "  build          Binary uret"
 	@echo "  test           Testleri calistir"
+	@echo "  cover          Coverage raporu (test sonrasi)"
 	@echo "  lint           golangci-lint"
 	@echo "  tidy           go mod tidy"
 	@echo "  clean          Temizle"
@@ -141,8 +142,7 @@ check:
 	golangci-lint run --timeout=5m
 	@echo ""
 	@echo "═══ 4/4  test ═══"
-	@echo "(su an test yok — asagidaki satir testler yazilinca aktif edilecek)"
-#	go test ./... -race -coverprofile=coverage.out
+	go test ./internal/... -race -coverprofile=coverage.out
 	@echo ""
 	@echo "✔ Tum kontroller gecti."
 
@@ -150,7 +150,10 @@ build:
 	go build -o reporeef-api ./cmd/server
 
 test:
-	go test ./... -race -coverprofile=coverage.out
+	go test ./internal/... -race -coverprofile=coverage.out
+
+cover: ## Coverage raporu (test sonrası)
+	@go tool cover -func=coverage.out
 
 lint:
 	golangci-lint run --timeout=5m

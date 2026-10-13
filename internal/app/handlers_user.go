@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -92,44 +91,17 @@ func handleUpdateMe(c *gin.Context) {
 		return
 	}
 
-	input.Username = sanitizeText(strings.TrimSpace(input.Username))
-	input.Bio = sanitizeText(strings.TrimSpace(input.Bio))
-
-	if input.Username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username_empty"})
-		return
-	}
-
-	// `user_` prefix reserved — geçici onboarding isimleri ile çakışmasın
-	if strings.HasPrefix(strings.ToLower(input.Username), "user_") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username_reserved"})
-		return
-	}
-
-	// Rezerve isimler
-	if ReservedUsernames[strings.ToLower(input.Username)] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username_reserved"})
-		return
-	}
-
-	// Format — baş/son noktalama + arka arkaya tekrar
-	if !isValidUsernameFormat(input.Username) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username_invalid_format"})
-		return
-	}
-
-	if err := validateTextMinMax("username", input.Username, MinUsernameLen, MaxUsernameLen, UsernameRegex, true); err != nil {
+	cleanUsername, cleanBio, err := validateProfileInput(input.Username, input.Bio)
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validateText("bio", input.Bio, MaxBioLen, BioRegex); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
+	input.Username = cleanUsername
+	input.Bio = cleanBio
 
 	// Case-insensitive çakışma kontrolü
 	var existingID int
-	err := db.QueryRow(ctx,
+	err = db.QueryRow(ctx,
 		`SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2`,
 		input.Username, userID,
 	).Scan(&existingID)
@@ -184,8 +156,8 @@ func handleGetUserByUsername(c *gin.Context) {
 	username := c.Param("username")
 	ctx := c.Request.Context()
 
-	if username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username_required"})
+	if err := validateUsernameParam(username); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -319,15 +291,14 @@ func handleGetUserByUsername(c *gin.Context) {
 
 // handleSearchUsers kullanıcı adına göre arama yapar (case-insensitive).
 func handleSearchUsers(c *gin.Context) {
-	query := strings.TrimSpace(c.Query("q"))
-
-	if query == "" {
-		c.JSON(http.StatusOK, []map[string]interface{}{})
+	query, err := validateSearchQuery(c.Query("q"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := validateText("search", query, MaxSearchLen, UsernameRegex); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if query == "" {
+		c.JSON(http.StatusOK, []map[string]interface{}{})
 		return
 	}
 
@@ -337,10 +308,6 @@ func handleSearchUsers(c *gin.Context) {
 			limit = n
 		}
 	}
-
-	query = strings.ReplaceAll(query, "\\", "\\\\")
-	query = strings.ReplaceAll(query, "%", "\\%")
-	query = strings.ReplaceAll(query, "_", "\\_")
 
 	rows, err := db.Query(c.Request.Context(), `
 		SELECT id, username, COALESCE(avatar_url, ''), COALESCE(bio, '')
