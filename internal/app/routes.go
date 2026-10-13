@@ -3,6 +3,7 @@ package app
 import (
 	"log"
 	"os"
+	"strings"
 
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-contrib/cors"
@@ -71,15 +72,15 @@ func NewRouter() *gin.Engine {
 	{
 		projects.GET("", authMiddlewareOptional(), handleListProjects)
 		projects.GET("/:id", authMiddlewareOptional(), handleGetProject)
-		projects.POST("", authMiddleware(), handleCreateProject)
-		projects.PUT("/:id", authMiddleware(), handleUpdateProject)
-		projects.DELETE("/:id", authMiddleware(), handleDeleteProject)
+		projects.POST("", authMiddleware(), requireOnboarded(), handleCreateProject)
+		projects.PUT("/:id", authMiddleware(), requireOnboarded(), handleUpdateProject)
+		projects.DELETE("/:id", authMiddleware(), requireOnboarded(), handleDeleteProject)
 
-		projects.POST("/:id/star", authMiddleware(), handleStarProject)
-		projects.DELETE("/:id/star", authMiddleware(), handleUnstarProject)
+		projects.POST("/:id/star", authMiddleware(), requireOnboarded(), handleStarProject)
+		projects.DELETE("/:id/star", authMiddleware(), requireOnboarded(), handleUnstarProject)
 
-		projects.POST("/:id/join", authMiddleware(), handleJoinProject)
-		projects.DELETE("/:id/leave", authMiddleware(), handleLeaveProject)
+		projects.POST("/:id/join", authMiddleware(), requireOnboarded(), handleJoinProject)
+		projects.DELETE("/:id/leave", authMiddleware(), requireOnboarded(), handleLeaveProject)
 		projects.GET("/:id/my-join-status", authMiddleware(), handleMyJoinStatus)
 		projects.DELETE("/:id/contributors/:userId", authMiddleware(), handleRemoveContributor)
 	}
@@ -115,28 +116,33 @@ func NewRouter() *gin.Engine {
 
 // setupCORS CORS middleware'ini yapılandırır.
 func setupCORS(router *gin.Engine) {
+	// Ana frontend URL'i .env'den
 	frontendURL := os.Getenv("FRONTEND_URL")
-	env := os.Getenv("ENV")
 
-	if frontendURL == "" {
+	// Ek izinli origin'ler (virgülle ayrılmış)
+	// Örnek: ALLOWED_ORIGINS=http://localhost:5173,https://reporeef.com,https://www.reporeef.com
+	extraOrigins := os.Getenv("ALLOWED_ORIGINS")
+
+	origins := []string{}
+
+	// Ana frontend URL
+	if frontendURL != "" {
+		origins = append(origins, frontendURL)
+	} else {
 		log.Println("[CORS WARNING] FRONTEND_URL is not set")
 	}
 
-	origins := []string{}
-	if frontendURL != "" {
-		origins = append(origins, frontendURL)
+	// Ek origin'ler
+	if extraOrigins != "" {
+		for _, o := range strings.Split(extraOrigins, ",") {
+			o = strings.TrimSpace(o)
+			if o != "" {
+				origins = append(origins, o)
+			}
+		}
 	}
 
-	if env == "development" || env == "dev" {
-		origins = append(origins, "http://localhost:5173")
-		log.Println("[CORS] development mode: localhost:5173 izinli")
-	} else if env == "" {
-		log.Println("[CORS] ENV set edilmemiş — production kabul ediliyor")
-	}
-
-	if len(origins) == 0 {
-		log.Println("[CORS WARNING] Hiçbir origin izinli değil")
-	}
+	log.Println("[CORS] izinli origin'ler:", origins)
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     origins,

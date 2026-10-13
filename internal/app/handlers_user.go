@@ -38,17 +38,20 @@ func handleMe(c *gin.Context) {
 	userID := c.GetInt("user_id")
 
 	var (
-		email     string
-		username  string
-		avatarURL string
-		bio       string
-		isPremium bool
+		email          string
+		username       string
+		githubUsername string
+		avatarURL      string
+		bio            string
+		isPremium      bool
+		onboarded      bool
 	)
 
 	err := db.QueryRow(c.Request.Context(), `
-		SELECT email, COALESCE(username, ''), COALESCE(avatar_url, ''), COALESCE(bio, ''), is_premium
+		SELECT email, COALESCE(username, ''), COALESCE(github_username, ''),
+		       COALESCE(avatar_url, ''), COALESCE(bio, ''), is_premium, onboarded
 		FROM users WHERE id = $1
-	`, userID).Scan(&email, &username, &avatarURL, &bio, &isPremium)
+	`, userID).Scan(&email, &username, &githubUsername, &avatarURL, &bio, &isPremium, &onboarded)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found"})
@@ -61,14 +64,16 @@ func handleMe(c *gin.Context) {
 	).Scan(&projectCount)
 
 	c.JSON(http.StatusOK, gin.H{
-		"user_id":      userID,
-		"email":        email,
-		"username":     username,
-		"avatar_url":   avatarURL,
-		"bio":          bio,
-		"is_premium":   isPremium,
-		"projectCount": projectCount,
-		"maxProjects":  MaxProjectsPerUser,
+		"user_id":         userID,
+		"email":           email,
+		"username":        username,
+		"github_username": githubUsername,
+		"avatar_url":      avatarURL,
+		"bio":             bio,
+		"is_premium":      isPremium,
+		"onboarded":       onboarded,
+		"projectCount":    projectCount,
+		"maxProjects":     MaxProjectsPerUser,
 	})
 }
 
@@ -95,6 +100,24 @@ func handleUpdateMe(c *gin.Context) {
 		return
 	}
 
+	// `user_` prefix reserved — geçici onboarding isimleri ile çakışmasın
+	if strings.HasPrefix(strings.ToLower(input.Username), "user_") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username_reserved"})
+		return
+	}
+
+	// Rezerve isimler
+	if ReservedUsernames[strings.ToLower(input.Username)] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username_reserved"})
+		return
+	}
+
+	// Format — baş/son noktalama + arka arkaya tekrar
+	if !isValidUsernameFormat(input.Username) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "username_invalid_format"})
+		return
+	}
+
 	if err := validateTextMinMax("username", input.Username, MinUsernameLen, MaxUsernameLen, UsernameRegex, true); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -104,9 +127,10 @@ func handleUpdateMe(c *gin.Context) {
 		return
 	}
 
+	// Case-insensitive çakışma kontrolü
 	var existingID int
 	err := db.QueryRow(ctx,
-		`SELECT id FROM users WHERE username = $1 AND id != $2`,
+		`SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2`,
 		input.Username, userID,
 	).Scan(&existingID)
 
@@ -119,9 +143,14 @@ func handleUpdateMe(c *gin.Context) {
 		return
 	}
 
-	_, err = db.Exec(ctx, `
-		UPDATE users SET username = $1, bio = $2 WHERE id = $3
-	`, input.Username, input.Bio, userID)
+	// onboarded=true — kullanıcı onboarding'i geçti (veya zaten geçmişti)
+	// is_premium'u da döndür ki yeni JWT üretebilelim.
+	var isPremium bool
+	err = db.QueryRow(ctx, `
+		UPDATE users SET username = $1, bio = $2, onboarded = true
+		WHERE id = $3
+		RETURNING is_premium
+	`, input.Username, input.Bio, userID).Scan(&isPremium)
 
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -134,10 +163,19 @@ func handleUpdateMe(c *gin.Context) {
 
 	auditLog(c, userID, "update", "user", userID)
 
+	// Yeni JWT — onboarded=true claim'i ile. Frontend bunu localStorage'a yazmalı.
+	newToken, err := generateJWT(userID, input.Username, isPremium, true)
+	if err != nil {
+		serverError(c, err, "")
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":  "profile_updated",
-		"username": input.Username,
-		"bio":      input.Bio,
+		"message":   "profile_updated",
+		"username":  input.Username,
+		"bio":       input.Bio,
+		"onboarded": true,
+		"token":     newToken,
 	})
 }
 

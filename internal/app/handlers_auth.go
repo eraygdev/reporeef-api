@@ -96,19 +96,25 @@ func handleGithubCallback(c *gin.Context) {
 
 	login = truncateRunes(login, MaxUsernameLen)
 
+	// Geçici username — çakışma imkansız çünkü github_id global unique.
+	// Kullanıcı onboarding'i tamamlayınca kendi seçtiği isim yazılır.
+	tempUsername := fmt.Sprintf("user_%d", githubID)
+
 	var (
 		userID     int
 		dbUsername string
 		isPremium  bool
+		onboarded  bool
 	)
 	err = db.QueryRow(ctx, `
-		INSERT INTO users (username, email, github_id, avatar_url, bio)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (email) DO UPDATE
-		SET github_id = EXCLUDED.github_id,
-			avatar_url = COALESCE(EXCLUDED.avatar_url, users.avatar_url)
-		RETURNING id, username, is_premium
-	`, login, email, githubID, avatar, bio).Scan(&userID, &dbUsername, &isPremium)
+		INSERT INTO users (username, email, github_id, github_username, avatar_url, bio, onboarded)
+		VALUES ($1, $2, $3, $4, $5, $6, false)
+		ON CONFLICT (github_id) DO UPDATE
+		SET github_username = EXCLUDED.github_username,
+			email           = EXCLUDED.email,
+			avatar_url      = COALESCE(EXCLUDED.avatar_url, users.avatar_url)
+		RETURNING id, username, is_premium, onboarded
+	`, tempUsername, email, githubID, login, avatar, bio).Scan(&userID, &dbUsername, &isPremium, &onboarded)
 	if err != nil {
 		serverError(c, err, "auth_failed")
 		return
@@ -116,7 +122,7 @@ func handleGithubCallback(c *gin.Context) {
 
 	auditLog(c, userID, "login", "user", userID)
 
-	jwtToken, err := generateJWT(userID, dbUsername, isPremium)
+	jwtToken, err := generateJWT(userID, dbUsername, isPremium, onboarded)
 	if err != nil {
 		serverError(c, err, "auth_failed")
 		return

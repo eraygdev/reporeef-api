@@ -196,3 +196,36 @@ func checkGithubRepoPublic(repoURL string) error {
 	}
 	return nil
 }
+
+// isValidUsernameFormat — baş/son noktalama ve arka arkaya tekrar kontrolü.
+// `UsernameRegex` karakter setini kontrol eder, bu fonksiyon düzeni kontrol eder.
+func isValidUsernameFormat(username string) bool {
+	if username == "" {
+		return false
+	}
+
+	// Baş/son karakterler harf veya rakam olmalı
+	first := username[0]
+	last := username[len(username)-1]
+	if !isAlnum(first) || !isAlnum(last) {
+		return false
+	}
+
+	// Arka arkaya aynı noktalama karakterleri yasak
+	if strings.Contains(username, "..") ||
+		strings.Contains(username, "__") ||
+		strings.Contains(username, "--") {
+		return false
+	}
+
+	return true
+}
+
+// isAlnum — ASCII harf veya rakam mı?
+// Türkçe karakterleri de kabul eder (byte bazlı kontrol yerine rune).
+func isAlnum(b byte) bool {
+	return (b >= 'a' && b <= 'z') ||
+		(b >= 'A' && b <= 'Z') ||
+		(b >= '0' && b <= '9') ||
+		b >= 0x80 // UTF-8 continuation / Türkçe karakter başlangıcı
+}

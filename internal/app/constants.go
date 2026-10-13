@@ -52,10 +52,22 @@ const (
 // Karakter filtreleri (frontend validators.js ile uyumlu)
 var (
 	TitleRegex    = regexp.MustCompile(`^[a-zA-Z0-9çÇğĞıİöÖşŞüÜ_. ]*$`)
-	UsernameRegex = regexp.MustCompile(`^[a-zA-Z0-9çÇğĞıİöÖşŞüÜ_.\- ]*$`)
+	UsernameRegex = regexp.MustCompile(`^[a-zA-Z0-9çÇğĞıİöÖşŞüÜ_.\-]*$`)
 	TextRegex     = regexp.MustCompile(`^[a-zA-Z0-9çÇğĞıİöÖşŞüÜ.,!?;:'"()\[\]{}\-_/|@#$%&*+=~\s]*$`)
 	BioRegex      = regexp.MustCompile(`^[a-zA-Z0-9çÇğĞıİöÖşŞüÜ.,!?;:'"()\[\]{}\-_/|@#$%&*+=~\s]*$`)
 )
+
+// ReservedUsernames — sistem veya gelecekteki route'lar için ayrılmış isimler.
+// Kullanıcılar bu isimleri alamaz (case-insensitive).
+var ReservedUsernames = map[string]bool{
+	"admin": true, "root": true, "api": true, "www": true, "mail": true,
+	"support": true, "help": true, "about": true, "settings": true,
+	"login": true, "register": true, "logout": true, "profile": true,
+	"dashboard": true, "project": true, "projects": true, "create-project": true,
+	"onboarding": true, "search": true, "explore": true, "user": true,
+	"users": true, "reporeef": true, "official": true, "system": true,
+	"moderator": true, "security": true, "billing": true, "premium": true,
+}
 
 // [YENİ] isAllowedContributorLimit — değer izinli listede mi?
 func isAllowedContributorLimit(limit int) bool {

@@ -88,11 +88,13 @@ func truncateRunes(s string, max int) string {
 
 // generateJWT 7 gün geçerli imzalı JWT üretir.
 // Email kasıtlı olarak çıkarıldı — privacy.
-func generateJWT(userID int, username string, isPremium bool) (string, error) {
+// onboarded claim'i: onboarding tamamlandı mı? (requireOnboarded için)
+func generateJWT(userID int, username string, isPremium, onboarded bool) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id":    userID,
 		"username":   username,
 		"is_premium": isPremium,
+		"onboarded":  onboarded,
 		"exp":        time.Now().Add(7 * 24 * time.Hour).Unix(),
 		"iat":        time.Now().Unix(),
 	}
@@ -140,6 +142,15 @@ func authMiddleware() gin.HandlerFunc {
 
 		if username, ok := claims["username"].(string); ok {
 			c.Set("username", username)
+		}
+
+		// Eski token'larda onboarded claim'i yok — migration öncesi
+		// üretilmiş token'lar için true varsay (mevcutlar zaten onboarded).
+		// 7 gün içinde tüm eski token'lar expire olur, bu dallanma ölür.
+		if onboarded, ok := claims["onboarded"].(bool); ok {
+			c.Set("onboarded", onboarded)
+		} else {
+			c.Set("onboarded", true)
 		}
 
 		c.Next()
@@ -194,5 +205,19 @@ func StartOAuthCleanup() {
 	defer ticker.Stop()
 	for range ticker.C {
 		cleanupOAuthStates()
+	}
+}
+
+// requireOnboarded — onboarded=false olan kullanıcıları engeller.
+// authMiddleware'den SONRA çağrılmalı (context'te onboarded olmalı).
+// DB sorgusu yapmaz — JWT claim'inden okur (stateless).
+func requireOnboarded() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if !c.GetBool("onboarded") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "onboarding_required"})
+			c.Abort()
+			return
+		}
+		c.Next()
 	}
 }
