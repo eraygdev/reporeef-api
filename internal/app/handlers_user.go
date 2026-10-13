@@ -115,14 +115,52 @@ func handleUpdateMe(c *gin.Context) {
 		return
 	}
 
+	// Mevcut username + son değişiklik zamanını al — cooldown kontrolü için
+	var (
+		currentUsername string
+		lastChangedAt   *time.Time
+	)
+	err = db.QueryRow(ctx,
+		`SELECT username, username_changed_at FROM users WHERE id = $1`,
+		userID,
+	).Scan(&currentUsername, &lastChangedAt)
+	if err != nil {
+		serverError(c, err, "")
+		return
+	}
+
+	// Sadece username gerçekten değişiyorsa cooldown kontrolü
+	usernameChanged := currentUsername != input.Username
+	if usernameChanged && !canChangeUsername(lastChangedAt, time.Now()) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "username_change_too_frequent"})
+		return
+	}
+
 	// onboarded=true — kullanıcı onboarding'i geçti (veya zaten geçmişti)
 	// is_premium'u da döndür ki yeni JWT üretebilelim.
+	// username_changed_at SADECE gerçekten değiştiyse güncellenir.
 	var isPremium bool
-	err = db.QueryRow(ctx, `
-		UPDATE users SET username = $1, bio = $2, onboarded = true
-		WHERE id = $3
-		RETURNING is_premium
-	`, input.Username, input.Bio, userID).Scan(&isPremium)
+
+	if usernameChanged {
+		err = db.QueryRow(ctx, `
+			UPDATE users
+			SET username = $1,
+			    bio = $2,
+			    onboarded = true,
+			    username_changed_at = NOW()
+			WHERE id = $3
+			RETURNING is_premium
+		`, input.Username, input.Bio, userID).Scan(&isPremium)
+	} else {
+		err = db.QueryRow(ctx, `
+			UPDATE users
+			SET username = $1,
+			    bio = $2,
+			    onboarded = true
+			WHERE id = $3
+			RETURNING is_premium
+		`, input.Username, input.Bio, userID).Scan(&isPremium)
+	}
 
 	if err != nil {
 		if isUniqueViolation(err) {
@@ -136,7 +174,7 @@ func handleUpdateMe(c *gin.Context) {
 	auditLog(c, userID, "update", "user", userID)
 
 	// Yeni JWT — onboarded=true claim'i ile. Frontend bunu localStorage'a yazmalı.
-	newToken, err := generateJWT(userID, input.Username, isPremium, true)
+	newToken, err := generateJWT(userID, isPremium, true)
 	if err != nil {
 		serverError(c, err, "")
 		return

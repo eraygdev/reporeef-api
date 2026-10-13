@@ -1,6 +1,9 @@
 package app
 
-import "regexp"
+import (
+	"regexp"
+	"time"
+)
 
 // ─────────────────────────────────────────────────────────
 // API VERSION
@@ -9,11 +12,16 @@ const APIVersion = "v1"
 
 // Profil limitleri
 const (
-	MinUsernameLen = 3
-	MaxUsernameLen = 30
-	MinBioLen      = 0
-	MaxBioLen      = 150
+	MinUsernameLen       = 3
+	MaxUsernameLen       = 30
+	MaxGithubUsernameLen = 39
+	MinBioLen            = 0
+	MaxBioLen            = 150
 )
+
+// UsernameChangeCooldown — username değiştirdikten sonra beklenmesi gereken süre.
+// 48 saat ≈ haftada 3 değişiklik.
+const UsernameChangeCooldown = 48 * time.Hour
 
 // Proje limitleri
 const (

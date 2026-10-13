@@ -66,6 +66,11 @@ func handleGithubCallback(c *gin.Context) {
 		githubID = int(v)
 	}
 
+	if githubID == 0 {
+		serverError(c, fmt.Errorf("github_id_missing"), "auth_failed")
+		return
+	}
+
 	email, _ := info["email"].(string)
 	if email == "" {
 		emailReq, _ := http.NewRequestWithContext(ctx, "GET", "https://api.github.com/user/emails", nil)
@@ -94,17 +99,16 @@ func handleGithubCallback(c *gin.Context) {
 		login = fmt.Sprintf("github_%d", githubID)
 	}
 
-	login = truncateRunes(login, MaxUsernameLen)
+	login = truncateRunes(login, MaxGithubUsernameLen)
 
 	// Geçici username — çakışma imkansız çünkü github_id global unique.
 	// Kullanıcı onboarding'i tamamlayınca kendi seçtiği isim yazılır.
 	tempUsername := fmt.Sprintf("user_%d", githubID)
 
 	var (
-		userID     int
-		dbUsername string
-		isPremium  bool
-		onboarded  bool
+		userID    int
+		isPremium bool
+		onboarded bool
 	)
 	err = db.QueryRow(ctx, `
 		INSERT INTO users (username, email, github_id, github_username, avatar_url, bio, onboarded)
@@ -113,8 +117,8 @@ func handleGithubCallback(c *gin.Context) {
 		SET github_username = EXCLUDED.github_username,
 			email           = EXCLUDED.email,
 			avatar_url      = COALESCE(EXCLUDED.avatar_url, users.avatar_url)
-		RETURNING id, username, is_premium, onboarded
-	`, tempUsername, email, githubID, login, avatar, bio).Scan(&userID, &dbUsername, &isPremium, &onboarded)
+		RETURNING id, is_premium, onboarded
+	`, tempUsername, email, githubID, login, avatar, bio).Scan(&userID, &isPremium, &onboarded)
 	if err != nil {
 		serverError(c, err, "auth_failed")
 		return
@@ -122,7 +126,7 @@ func handleGithubCallback(c *gin.Context) {
 
 	auditLog(c, userID, "login", "user", userID)
 
-	jwtToken, err := generateJWT(userID, dbUsername, isPremium, onboarded)
+	jwtToken, err := generateJWT(userID, isPremium, onboarded)
 	if err != nil {
 		serverError(c, err, "auth_failed")
 		return

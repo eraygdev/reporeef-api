@@ -36,9 +36,7 @@ func handleListProjects(c *gin.Context) {
 	}
 
 	if search != "" {
-		search = strings.ReplaceAll(search, "\\", "\\\\")
-		search = strings.ReplaceAll(search, "%", "\\%")
-		search = strings.ReplaceAll(search, "_", "\\_")
+		search = escapeLikePattern(search)
 	}
 
 	var categoryIDs []int
@@ -108,7 +106,7 @@ func handleListProjects(c *gin.Context) {
 
 	limitIdx := argIdx
 	offsetIdx := argIdx + 1
-	args = append(args, limit, offset)
+	args = append(args, limit+1, offset)
 
 	orderClause := "p.created_at DESC, p.id DESC" // default: newest
 
@@ -209,7 +207,15 @@ func handleListProjects(c *gin.Context) {
 		})
 	}
 
-	c.JSON(http.StatusOK, projects)
+	hasMore := len(projects) > limit
+	if hasMore {
+		projects = projects[:limit]
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"projects": projects,
+		"hasMore":  hasMore,
+	})
 }
 
 // handleGetProject tek projenin tüm detayını döner.
@@ -672,16 +678,16 @@ func handleUpdateProject(c *gin.Context) {
 	`, input.Title, input.Description, input.LongDescription,
 		input.GithubURL, input.DemoURL, input.ImageURL, projectID)
 	if err != nil {
+		if isUniqueViolationOn(err, "idx_projects_github_url_unique") {
+			c.JSON(http.StatusConflict, gin.H{"error": "github_url_taken"})
+			return
+		}
 		serverError(c, err, "")
 		return
 	}
 
 	_, err = tx.Exec(ctx, `DELETE FROM project_categories WHERE project_id = $1`, projectID)
 	if err != nil {
-		if isUniqueViolationOn(err, "idx_projects_github_url_unique") {
-			c.JSON(http.StatusConflict, gin.H{"error": "github_url_taken"})
-			return
-		}
 		serverError(c, err, "")
 		return
 	}

@@ -89,10 +89,9 @@ func truncateRunes(s string, max int) string {
 // generateJWT 7 gün geçerli imzalı JWT üretir.
 // Email kasıtlı olarak çıkarıldı — privacy.
 // onboarded claim'i: onboarding tamamlandı mı? (requireOnboarded için)
-func generateJWT(userID int, username string, isPremium, onboarded bool) (string, error) {
+func generateJWT(userID int, isPremium, onboarded bool) (string, error) {
 	claims := jwt.MapClaims{
 		"user_id":    userID,
-		"username":   username,
 		"is_premium": isPremium,
 		"onboarded":  onboarded,
 		"exp":        time.Now().Add(7 * 24 * time.Hour).Unix(),
@@ -139,10 +138,6 @@ func authMiddleware() gin.HandlerFunc {
 			return
 		}
 		c.Set("user_id", int(uid))
-
-		if username, ok := claims["username"].(string); ok {
-			c.Set("username", username)
-		}
 
 		// Eski token'larda onboarded claim'i yok — migration öncesi
 		// üretilmiş token'lar için true varsay (mevcutlar zaten onboarded).

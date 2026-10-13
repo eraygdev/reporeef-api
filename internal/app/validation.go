@@ -415,3 +415,16 @@ func validateProjectInput(input ProjectInput, isCreate bool) (ProjectInput, erro
 
 	return input, nil
 }
+
+// canChangeUsername — son username değişikliğinden bu yana yeterli süre geçti mi?
+//
+// lastChangedAt nil → hiç değişmemiş, izin ver.
+// Aksi halde now - lastChangedAt >= UsernameChangeCooldown olmalı.
+//
+// Pure fonksiyon — now dışarıdan alınır (test edilebilirlik için).
+func canChangeUsername(lastChangedAt *time.Time, now time.Time) bool {
+	if lastChangedAt == nil {
+		return true
+	}
+	return now.Sub(*lastChangedAt) >= UsernameChangeCooldown
+}

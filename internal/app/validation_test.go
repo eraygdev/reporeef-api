@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // ═══════════════════════════════════════════════════════════
@@ -507,4 +508,45 @@ func TestValidateProjectInput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ═══════════════════════════════════════════════════════════
+// canChangeUsername
+// ═══════════════════════════════════════════════════════════
+
+func TestCanChangeUsername(t *testing.T) {
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+
+	oneHourAgo := now.Add(-1 * time.Hour)
+	fortySevenHoursAgo := now.Add(-47 * time.Hour)
+	fortyEightHoursAgo := now.Add(-48 * time.Hour)
+	seventyTwoHoursAgo := now.Add(-72 * time.Hour)
+
+	tests := []struct {
+		name          string
+		lastChangedAt *time.Time
+		now           time.Time
+		want          bool
+	}{
+		{name: "hiç değişmemiş (nil)", lastChangedAt: nil, now: now, want: true},
+		{name: "1 saat önce — cooldown", lastChangedAt: &oneHourAgo, now: now, want: false},
+		{name: "47 saat önce — cooldown", lastChangedAt: &fortySevenHoursAgo, now: now, want: false},
+		{name: "48 saat önce — tam sınır", lastChangedAt: &fortyEightHoursAgo, now: now, want: true},
+		{name: "72 saat önce — serbest", lastChangedAt: &seventyTwoHoursAgo, now: now, want: true},
+		{name: "1 saniye kala — cooldown", lastChangedAt: ptrTime(now.Add(-48*time.Hour + time.Second)), now: now, want: false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := canChangeUsername(tc.lastChangedAt, tc.now)
+			if got != tc.want {
+				t.Errorf("canChangeUsername() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// ptrTime — &time.Time döndürmek için küçük yardımcı.
+func ptrTime(t time.Time) *time.Time {
+	return &t
 }
