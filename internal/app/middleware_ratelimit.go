@@ -70,7 +70,13 @@ func rateLimitMiddleware() gin.HandlerFunc {
 	go rateLimiters.cleanupStale(1*time.Minute, 5*time.Minute)
 
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
+		// Healthcheck gürültüsünü engelle (RequestLogger ile aynı liste)
+		if skipPaths[c.Request.URL.Path] {
+			c.Next()
+			return
+		}
+
+		ip := clientIP(c)
 
 		limiter := rateLimiters.getLimiter(ip)
 

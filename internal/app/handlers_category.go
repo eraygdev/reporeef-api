@@ -35,6 +35,11 @@ func handleListCategories(c *gin.Context) {
 		})
 	}
 
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
+	}
+
 	c.JSON(http.StatusOK, categories)
 }
 

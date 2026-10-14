@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -68,6 +69,10 @@ func cleanupOAuthStates() {
 // InitOAuth GitHub OAuth yapılandırmasını .env'den okur.
 func InitOAuth() {
 	jwtSecret = []byte(os.Getenv("JWT_SECRET"))
+	if len(jwtSecret) == 0 {
+		slog.Error("JWT_SECRET environment variable is not set")
+		os.Exit(1)
+	}
 	githubOauthConfig = &oauth2.Config{
 		ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),

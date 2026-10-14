@@ -65,6 +65,8 @@ for line in sys.stdin:
         )  # ANSI kodları ~9 karakter
         duration = DIM(f"{d.get('duration_ms', 0)}ms".rjust(8))
         out = f"{DIM(t)} {lvl} {method} {path} {status} {duration}"
+        if d.get("ip"):
+            out += f" {DIM('ip=' + str(d['ip']))}"
         if d.get("user_id"):
             out += f" {MAGENTA('u=' + str(d['user_id']))}"
         if d.get("repo"):

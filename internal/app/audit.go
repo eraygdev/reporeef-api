@@ -23,7 +23,7 @@ func auditLog(c *gin.Context, userID int, action, entityType string, entityID in
 	_, err := db.Exec(context.Background(), `
 		INSERT INTO audit_logs (user_id, action, entity_type, entity_id, ip_address, user_agent)
 		VALUES ($1, $2, $3, $4, $5, $6)
-	`, uid, action, entityType, eid, c.ClientIP(), c.Request.UserAgent())
+	`, uid, action, entityType, eid, clientIP(c), c.Request.UserAgent())
 
 	if err != nil {
 		slog.Error("audit log insert failed",

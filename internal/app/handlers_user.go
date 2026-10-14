@@ -167,6 +167,10 @@ func handleUpdateMe(c *gin.Context) {
 			c.JSON(http.StatusConflict, gin.H{"error": "username_taken"})
 			return
 		}
+		if errors.Is(err, pgx.ErrNoRows) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found"})
+			return
+		}
 		serverError(c, err, "")
 		return
 	}
@@ -309,6 +313,11 @@ func handleGetUserByUsername(c *gin.Context) {
 		})
 	}
 
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
+	}
+
 	hasMore := count > limit
 
 	c.JSON(http.StatusOK, gin.H{
@@ -381,6 +390,11 @@ func handleSearchUsers(c *gin.Context) {
 			"avatar_url": avatarURL,
 			"bio":        bio,
 		})
+	}
+
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
 	}
 
 	c.JSON(http.StatusOK, users)

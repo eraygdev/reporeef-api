@@ -17,7 +17,7 @@ func NewRouter() *gin.Engine {
 	// gin.New() + gin.Recovery() kullanıyoruz.
 	// Log artık tamamen slog üzerinden.
 	router := gin.New()
-	router.Use(gin.Recovery())
+	router.Use(Recovery())
 
 	// Sentry middleware — panikleri yakalar
 	// Repanic: true → Gin'in kendi Recovery'si hâlâ çalışsın
@@ -30,23 +30,19 @@ func NewRouter() *gin.Engine {
 	// Güvenilir proxy ayarı — X-Forwarded-For spoofing'i engeller
 	// Production'da sadece Cloudflare IP'lerine güven
 	if os.Getenv("ENV") == "production" {
+		// Topoloji: Cloudflare Edge → cloudflared (Docker) → backend
+		// Backend'in doğrudan peer'ı cloudflared container'ı (RFC1918).
+		// Cloudflare edge IP'leri KALDIRILDI — tunnel modunda backend'e
+		// doğrudan bağlanmıyorlar. Onun yerine Docker internal network +
+		// loopback güvenilir sayılır. Cloudflared, gerçek kullanıcı IP'sini
+		// X-Forwarded-For header'ına set eder; Gin bu header'ı güvenilir
+		// peer'dan geldiği için okur.
 		_ = router.SetTrustedProxies([]string{
-			// Cloudflare IP aralıkları
-			"173.245.48.0/20",
-			"103.21.244.0/22",
-			"103.22.200.0/22",
-			"103.31.4.0/22",
-			"141.101.64.0/18",
-			"108.162.192.0/18",
-			"190.93.240.0/20",
-			"188.114.96.0/20",
-			"197.234.240.0/22",
-			"198.41.128.0/17",
-			"162.158.0.0/15",
-			"104.16.0.0/13",
-			"104.24.0.0/14",
-			"172.64.0.0/13",
-			"131.0.72.0/22",
+			"127.0.0.1/32",
+			"::1/128",
+			"10.0.0.0/8",
+			"172.16.0.0/12",
+			"192.168.0.0/16",
 		})
 	} else {
 		// Development'ta X-Forwarded-For'a hiç güvenme
@@ -151,6 +147,6 @@ func setupCORS(router *gin.Engine) {
 		AllowOrigins:     origins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
-		AllowCredentials: true,
+		AllowCredentials: false,
 	}))
 }

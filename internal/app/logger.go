@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,12 @@ import (
 // logger — paket genelinde kullanılan slog instance'ı.
 // main.go'da InitLogger ile set edilir.
 var logger *slog.Logger
+
+// skipPaths — log ve rate limit için atlanacak path'ler.
+// Healthcheck gürültüsünü engeller.
+var skipPaths = map[string]bool{
+	"/ping": true,
+}
 
 // InitLogger — slog'u başlatır.
 //   - production: JSON (Loki/Datadog/CloudWatch uyumlu)
@@ -46,15 +53,31 @@ func generateRequestID() string {
 	return hex.EncodeToString(b)
 }
 
+// clientIP — gerçek kullanıcı IP'sini döner.
+//
+// Topoloji: Cloudflare Edge → cloudflared (Docker) → backend
+// c.ClientIP() bu topolojide cloudflared container IP'sini (172.x.x.x)
+// döner, çünkü backend'in doğrudan peer'ı odur. Cloudflare edge,
+// gerçek kullanıcı IP'sini CF-Connecting-IP header'ına set eder;
+// cloudflared bunu backend'e forward eder.
+//
+// Güvenlik: Prod'da backend'e sadece cloudflared erişebilir (docker-compose'da
+// 127.0.0.1:8080:8080), bu yüzden header spoof edilemez. Dev'de backend
+// doğrudan localhost'tan erişilebilir, spoof'a açık — bu yüzden
+// dev'de header yok sayılır, c.ClientIP() kullanılır.
+func clientIP(c *gin.Context) string {
+	if os.Getenv("ENV") == "production" {
+		if ip := strings.TrimSpace(c.GetHeader("CF-Connecting-IP")); ip != "" {
+			return ip
+		}
+	}
+	return c.ClientIP()
+}
+
 // RequestLogger — her isteği baştan sona loglar.
 // Request'e request_id atar, X-Request-ID header'ı olarak geri döner.
 // Seviye: 5xx → error, 4xx → warn, diğer → info.
 func RequestLogger() gin.HandlerFunc {
-	// Healthcheck ve benzeri gürültülü path'ler log'lanmaz.
-	skipPaths := map[string]bool{
-		"/ping": true,
-	}
-
 	return func(c *gin.Context) {
 		if skipPaths[c.Request.URL.Path] {
 			c.Next()
@@ -86,7 +109,7 @@ func RequestLogger() gin.HandlerFunc {
 			"status", status,
 			"duration_ms", duration.Milliseconds(),
 			"request_id", reqID,
-			"ip", c.ClientIP(),
+			"ip", clientIP(c),
 		}
 
 		if uid := c.GetInt("user_id"); uid > 0 {

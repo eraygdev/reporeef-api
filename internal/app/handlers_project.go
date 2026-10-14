@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -207,6 +208,11 @@ func handleListProjects(c *gin.Context) {
 		})
 	}
 
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
+	}
+
 	hasMore := len(projects) > limit
 	if hasMore {
 		projects = projects[:limit]
@@ -311,6 +317,13 @@ func handleGetProject(c *gin.Context) {
 					"avatar_url": avatarURL,
 				})
 			}
+		}
+		if rowErr := contribRows.Err(); rowErr != nil {
+			slog.Warn("contributors fetch failed",
+				"request_id", c.GetString("request_id"),
+				"project_id", id,
+				"err", rowErr,
+			)
 		}
 		project.ContributorsList = contributors
 	} else {
@@ -530,6 +543,11 @@ func handleMyProjects(c *gin.Context) {
 			"categories":   categories,
 			"categoryIds":  categoryIDs,
 		})
+	}
+
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
 	}
 
 	hasMore := count > limit

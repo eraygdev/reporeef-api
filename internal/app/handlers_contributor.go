@@ -60,7 +60,7 @@ func handleJoinProject(c *gin.Context) {
 
 	message := ""
 	if isPremium {
-		message = strings.TrimSpace(input.Message)
+		message = sanitizeText(strings.TrimSpace(input.Message))
 		if utf8.RuneCountInString(message) > MaxContributorMessageLen {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "message_too_long"})
 			return
@@ -238,6 +238,11 @@ func handleContributorRequests(c *gin.Context) {
 		})
 	}
 
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
+	}
+
 	c.JSON(http.StatusOK, requests)
 }
 
@@ -324,11 +329,17 @@ func handleRequestAction(c *gin.Context, action string) {
 			return
 		}
 	} else {
-		_, err = db.Exec(ctx, `
+		result, execErr := db.Exec(ctx, `
 			UPDATE project_contributors
 			SET status = 'rejected'
-			WHERE id = $1
+			WHERE id = $1 AND status = 'pending'
 		`, requestID)
+		if execErr != nil {
+			err = execErr
+		} else if result.RowsAffected() == 0 {
+			c.JSON(http.StatusConflict, gin.H{"error": "request_already_processed"})
+			return
+		}
 	}
 
 	if err != nil {
@@ -437,6 +448,11 @@ func handleMyContributions(c *gin.Context) {
 			"categories":   categories,
 			"categoryIds":  categoryIDs,
 		})
+	}
+
+	if err := rows.Err(); err != nil {
+		serverError(c, err, "")
+		return
 	}
 
 	c.JSON(http.StatusOK, projects)

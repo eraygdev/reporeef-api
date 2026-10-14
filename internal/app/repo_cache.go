@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -98,7 +99,7 @@ func StartRepoCacheCleanup() {
 // checkGithubRepoPublicCached — checkGithubRepoPublic için cache wrapper.
 // Aynı repo URL'i 5 dakika içinde tekrar sorulursa GitHub'a gitmez.
 func checkGithubRepoPublicCached(repoURL string) error {
-	key := normalizeGithubRepoURL(repoURL)
+	key := strings.ToLower(normalizeGithubRepoURL(repoURL))
 	if key == "" {
 		return fmt.Errorf("invalid_github_url")
 	}
