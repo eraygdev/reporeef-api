@@ -1,7 +1,7 @@
 package app
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -23,6 +23,10 @@ func NewRouter() *gin.Engine {
 	// Sentry middleware — panikleri yakalar
 	// Repanic: true → Gin'in kendi Recovery'si hâlâ çalışsın
 	router.Use(sentrygin.New(sentrygin.Options{Repanic: true}))
+
+	// Request logger — her isteği structured JSON olarak loglar,
+	// her isteğe request_id atar (X-Request-ID header'ı olarak döner).
+	router.Use(RequestLogger())
 
 	// Güvenilir proxy ayarı — X-Forwarded-For spoofing'i engeller
 	// Production'da sadece Cloudflare IP'lerine güven
@@ -129,7 +133,7 @@ func setupCORS(router *gin.Engine) {
 	if frontendURL != "" {
 		origins = append(origins, frontendURL)
 	} else {
-		log.Println("[CORS WARNING] FRONTEND_URL is not set")
+		slog.Warn("FRONTEND_URL is not set")
 	}
 
 	// Ek origin'ler
@@ -142,7 +146,7 @@ func setupCORS(router *gin.Engine) {
 		}
 	}
 
-	log.Println("[CORS] izinli origin'ler:", origins)
+	slog.Info("cors origins configured", "origins", origins)
 
 	router.Use(cors.New(cors.Config{
 		AllowOrigins:     origins,

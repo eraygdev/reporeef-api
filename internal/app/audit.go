@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/gin-gonic/gin"
 )
@@ -26,6 +26,11 @@ func auditLog(c *gin.Context, userID int, action, entityType string, entityID in
 	`, uid, action, entityType, eid, c.ClientIP(), c.Request.UserAgent())
 
 	if err != nil {
-		log.Printf("[AUDIT ERROR] %v", err)
+		slog.Error("audit log insert failed",
+			"request_id", c.GetString("request_id"),
+			"action", action,
+			"entity_type", entityType,
+			"err", err,
+		)
 	}
 }

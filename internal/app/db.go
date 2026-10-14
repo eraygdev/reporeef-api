@@ -2,7 +2,7 @@ package app
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -15,12 +15,14 @@ var db *pgxpool.Pool
 func Connect() {
 	connString := os.Getenv("DATABASE_URL")
 	if connString == "" {
-		log.Fatal("DATABASE_URL environment variable is not set")
+		slog.Error("DATABASE_URL environment variable is not set")
+		os.Exit(1)
 	}
 
 	config, err := pgxpool.ParseConfig(connString)
 	if err != nil {
-		log.Fatalf("Failed to parse database config: %v", err)
+		slog.Error("failed to parse database config", "err", err)
+		os.Exit(1)
 	}
 
 	config.MaxConns = 10
@@ -31,16 +33,18 @@ func Connect() {
 
 	db, err = pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
-		log.Fatalf("Failed to create connection pool: %v", err)
+		slog.Error("failed to create connection pool", "err", err)
+		os.Exit(1)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	if err := db.Ping(ctx); err != nil {
-		log.Fatalf("Database ping failed: %v", err)
+		slog.Error("database ping failed", "err", err)
+		os.Exit(1)
 	}
 
-	log.Println("Database connected successfully")
+	slog.Info("database connected")
 }
 
 // Close graceful shutdown için.

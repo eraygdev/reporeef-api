@@ -1,6 +1,6 @@
 include .env
 export
-.PHONY: help up down logs logs-t logs-cf logs-cf-t logs-all logs-all-t logs-errors logs-500 logs-4xx logs-important logs-rate logs-auth logs-forbidden logs-filter restart rebuild run build test cover lint tidy clean check migrate-up migrate-down migrate-version migrate-new migrate-force
+.PHONY: help up down logs logs-t logs-cf logs-cf-t logs-all logs-all-t logs-errors logs-500 logs-4xx logs-important logs-rate logs-slow restart rebuild run build test cover lint tidy clean check migrate-up migrate-down migrate-version migrate-new migrate-force
 
 help:
 	@echo "RepoReef Backend — Komutlar:"
@@ -22,14 +22,12 @@ help:
 	@echo "  logs-all-t     Tum loglar (yeni tab)"
 	@echo ""
 	@echo "  ── LOGS (filtreli, canli) ──"
-	@echo "  logs-errors    Sadece [ERROR]"
-	@echo "  logs-500       Sadece 500 donen istekler"
+	@echo "  logs-errors    Sadece error seviyesi (JSON)"
+	@echo "  logs-500       Sadece 5xx donen istekler"
 	@echo "  logs-4xx       Sadece 4xx donen istekler"
-	@echo "  logs-important 500 + rate limit + auth fail + forbidden + filter"
+	@echo "  logs-important Error + warn + 5xx"
 	@echo "  logs-rate      Rate limit olaylari"
-	@echo "  logs-auth      Auth hatalari"
-	@echo "  logs-forbidden Yetki hatalari"
-	@echo "  logs-filter    Profanity filtre olaylari"
+	@echo "  logs-slow      500ms ustu yavas istekler"
 	@echo ""
 	@echo "  ── KONTROL ──"
 	@echo "  check          build + vet + lint (+ test)"
@@ -86,29 +84,26 @@ logs-all-t:
 # LOGS — Filtreli (canli, sadece ilgili satirlar)
 # ═══════════════════════════════════════════════════════════
 
+# jq gerekir: sudo apt install jq
+# JSON log satırlarını renkli, filtrelenmiş gösterir.
+
 logs-errors:
-	docker compose logs -f --tail 0 backend | grep --line-buffered "\[ERROR\]"
+	docker compose logs -f --tail 0 backend | jq -R -r 'fromjson? | select(.level=="ERROR")'
 
 logs-500:
-	docker compose logs -f --tail 0 backend | grep --line-buffered -E "\| 500 \|"
+	docker compose logs -f --tail 0 backend | jq -R -r 'fromjson? | select(.status >= 500)'
 
 logs-4xx:
-	docker compose logs -f --tail 0 backend | grep --line-buffered -E "\| 4[0-9][0-9] \|"
+	docker compose logs -f --tail 0 backend | jq -R -r 'fromjson? | select(.status >= 400 and .status < 500)'
 
 logs-important:
-	docker compose logs -f --tail 0 backend | grep --line-buffered -E "\[(ERROR|RATE LIMIT|AUTH FAIL|FORBIDDEN|FILTER)\]|\| 500 \|"
+	docker compose logs -f --tail 0 backend | jq -R -r 'fromjson? | select((.level=="ERROR" or .level=="WARN") or .status >= 500)'
 
 logs-rate:
-	docker compose logs -f --tail 0 backend | grep --line-buffered "\[RATE LIMIT\]"
+	docker compose logs -f --tail 0 backend | jq -R -r 'fromjson? | select(.msg=="rate limit exceeded")'
 
-logs-auth:
-	docker compose logs -f --tail 0 backend | grep --line-buffered "\[AUTH FAIL\]"
-
-logs-forbidden:
-	docker compose logs -f --tail 0 backend | grep --line-buffered "\[FORBIDDEN\]"
-
-logs-filter:
-	docker compose logs -f --tail 0 backend | grep --line-buffered "\[FILTER\]"
+logs-slow:
+	docker compose logs -f --tail 0 backend | jq -R -r 'fromjson? | select(.duration_ms > 500)'
 
 # ═══════════════════════════════════════════════════════════
 # DOCKER — Restart / Rebuild

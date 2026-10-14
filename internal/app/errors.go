@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/getsentry/sentry-go"
 	sentrygin "github.com/getsentry/sentry-go/gin"
@@ -38,7 +38,13 @@ func serverError(c *gin.Context, err error, publicMsg string) {
 		})
 	}
 
-	log.Printf("[ERROR] %s %s: %v", c.Request.Method, c.Request.URL.Path, err)
+	slog.Error("server error",
+		"request_id", c.GetString("request_id"),
+		"method", c.Request.Method,
+		"path", c.Request.URL.Path,
+		"err", err,
+		"public_msg", publicMsg,
+	)
 	c.JSON(500, gin.H{"error": publicMsg})
 }
 

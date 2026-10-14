@@ -1,6 +1,7 @@
 package app
 
 import (
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -74,6 +75,12 @@ func rateLimitMiddleware() gin.HandlerFunc {
 		limiter := rateLimiters.getLimiter(ip)
 
 		if !limiter.Allow() {
+			slog.Warn("rate limit exceeded",
+				"request_id", c.GetString("request_id"),
+				"ip", ip,
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+			)
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "too_many_requests",
 			})
