@@ -1,6 +1,6 @@
 include .env
 export
-.PHONY: help up down logs logs-t logs-cf logs-cf-t logs-all logs-all-t logs-errors logs-500 logs-4xx logs-important logs-rate logs-slow restart rebuild run build test cover lint tidy clean check migrate-up migrate-down migrate-version migrate-new migrate-force
+.PHONY: help up down logs logs-t logs-cf logs-cf-t logs-all logs-all-t logs-errors logs-500 logs-4xx logs-important logs-rate logs-slow restart rebuild run build test cover lint tidy clean clean-docker check migrate-up migrate-down migrate-version migrate-new migrate-force
 
 help:
 	@echo "RepoReef Backend — Komutlar:"
@@ -36,7 +36,8 @@ help:
 	@echo "  cover          Coverage raporu (test sonrasi)"
 	@echo "  lint           golangci-lint"
 	@echo "  tidy           go mod tidy"
-	@echo "  clean          Temizle"
+	@echo "  clean          Binary + coverage temizle"
+	@echo "  clean-docker   Docker cache + unused image/volume temizle"
 	@echo ""
 	@echo "  ── MIGRATIONS ──"
 	@echo "  migrate-up     Bekleyen migration'ları uygula"
@@ -158,6 +159,22 @@ tidy:
 
 clean:
 	rm -f reporeef-api coverage.out
+
+clean-docker: ## Docker build cache + unused image/volume temizle
+	@echo "═══ Docker temizlik ═══"
+	@echo ""
+	@echo "Önce:"
+	@docker system df
+	@echo ""
+	docker builder prune -a -f
+	docker image prune -a -f
+	docker volume prune -f
+	docker container prune -f
+	@echo ""
+	@echo "Sonra:"
+	@docker system df
+	@echo ""
+	@echo "✔ Temizlik tamamlandı."
 
 	# ═══════════════════════════════════════════════════════════
 # MIGRATIONS
