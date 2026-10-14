@@ -48,7 +48,17 @@ func generateRequestID() string {
 // Request'e request_id atar, X-Request-ID header'ı olarak geri döner.
 // Seviye: 5xx → error, 4xx → warn, diğer → info.
 func RequestLogger() gin.HandlerFunc {
+	// Healthcheck ve benzeri gürültülü path'ler log'lanmaz.
+	skipPaths := map[string]bool{
+		"/ping": true,
+	}
+
 	return func(c *gin.Context) {
+		if skipPaths[c.Request.URL.Path] {
+			c.Next()
+			return
+		}
+
 		start := time.Now()
 		reqID := generateRequestID()
 

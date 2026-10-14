@@ -12,13 +12,12 @@ import (
 
 // NewRouter tüm middleware ve route'ları bağlar, hazır *gin.Engine döner.
 func NewRouter() *gin.Engine {
-	var router *gin.Engine
-	if os.Getenv("ENV") == "production" {
-		router = gin.New()
-		router.Use(gin.Recovery())
-	} else {
-		router = gin.Default()
-	}
+	// gin.Default() kullanmıyoruz — içindeki Logger middleware'i
+	// bizim structured RequestLogger ile çakışıyor. Onun yerine
+	// gin.New() + gin.Recovery() kullanıyoruz.
+	// Log artık tamamen slog üzerinden.
+	router := gin.New()
+	router.Use(gin.Recovery())
 
 	// Sentry middleware — panikleri yakalar
 	// Repanic: true → Gin'in kendi Recovery'si hâlâ çalışsın
