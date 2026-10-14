@@ -8,8 +8,8 @@ help:
 	@echo "  ── DOCKER ──"
 	@echo "  up             Stack'i baslat"
 	@echo "  down           Stack'i durdur"
-	@echo "  restart        Backend'i yeniden baslat"
-	@echo "  rebuild        Kod degisti, yeniden derle"
+	@echo "  restart        Backend'i yeniden baslat (kod degismedi)"
+	@echo "  rebuild        Kod degisti, yeniden derle (tum servisler)"
 	@echo ""
 	@echo "  ── LOGS (bu terminal) ──"
 	@echo "  logs           Backend loglari (tek satir, renkli degil)"
@@ -114,7 +114,7 @@ restart:
 	docker compose restart backend
 
 rebuild:
-	docker compose up -d --build backend
+	docker compose up -d --build
 
 # ═══════════════════════════════════════════════════════════
 # GO
