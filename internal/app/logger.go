@@ -18,17 +18,19 @@ var logger *slog.Logger
 //   - production: JSON (Loki/Datadog/CloudWatch uyumlu)
 //   - development: text (terminal'de okunabilir)
 func InitLogger() {
-	var handler slog.Handler
-
-	if os.Getenv("ENV") == "production" {
-		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
-		})
-	} else {
-		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-			Level: slog.LevelDebug,
-		})
+	// Her zaman JSON handler kullan — dev ve prod format aynı olsun.
+	// Terminal'de insan-okunur görünüm için `make logs` jq kullanır.
+	// Dosyaya (docker logs) JSON olarak yazılır → Loki/Datadog'a hazır.
+	//
+	// Seviye: prod=Info, dev=Debug (repo cache hit/miss gibi satırlar görünür).
+	level := slog.LevelInfo
+	if os.Getenv("ENV") != "production" {
+		level = slog.LevelDebug
 	}
+
+	handler := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: level,
+	})
 
 	logger = slog.New(handler)
 	slog.SetDefault(logger)
