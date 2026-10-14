@@ -15,9 +15,18 @@ import (
 // main.go'da InitLogger ile set edilir.
 var logger *slog.Logger
 
-// skipPaths — log ve rate limit için atlanacak path'ler.
-// Healthcheck gürültüsünü engeller.
-var skipPaths = map[string]bool{
+// skipLogPaths — log basılmayacak path'ler (healthcheck gürültüsü).
+// /ping ucuz ve sık çağrılır → log yok.
+// /ready DB'ye vurur ama hâlâ healthcheck → log yok.
+var skipLogPaths = map[string]bool{
+	"/ping":  true,
+	"/ready": true,
+}
+
+// skipRateLimitPaths — rate limit dışı bırakılacak path'ler.
+// Sadece /ping: DB'ye vurmaz, ucuz, her healthcheck için gerekli.
+// /ready burada DEĞİL — DB'ye vuruyor, rate limit altında kalmalı.
+var skipRateLimitPaths = map[string]bool{
 	"/ping": true,
 }
 
@@ -39,7 +48,11 @@ func InitLogger() {
 		Level: level,
 	})
 
-	logger = slog.New(handler)
+	// Her log satırına service=backend ekle.
+	// make logs-all gibi karışık çıktılarda backend satırlarını
+	// ayırt etmek ve ileride Loki/Datadog'da {service="backend"}
+	// filtresi kurabilmek için.
+	logger = slog.New(handler).With("service", "backend")
 	slog.SetDefault(logger)
 }
 
@@ -79,7 +92,7 @@ func clientIP(c *gin.Context) string {
 // Seviye: 5xx → error, 4xx → warn, diğer → info.
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if skipPaths[c.Request.URL.Path] {
+		if skipLogPaths[c.Request.URL.Path] {
 			c.Next()
 			return
 		}

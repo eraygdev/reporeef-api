@@ -310,13 +310,19 @@ func handleGetProject(c *gin.Context) {
 		for contribRows.Next() {
 			var uid int
 			var username, avatarURL string
-			if err := contribRows.Scan(&uid, &username, &avatarURL); err == nil {
-				contributors = append(contributors, map[string]interface{}{
-					"user_id":    uid,
-					"username":   username,
-					"avatar_url": avatarURL,
-				})
+			if scanErr := contribRows.Scan(&uid, &username, &avatarURL); scanErr != nil {
+				slog.Warn("contributor scan failed",
+					"request_id", c.GetString("request_id"),
+					"project_id", id,
+					"err", scanErr,
+				)
+				continue
 			}
+			contributors = append(contributors, map[string]interface{}{
+				"user_id":    uid,
+				"username":   username,
+				"avatar_url": avatarURL,
+			})
 		}
 		if rowErr := contribRows.Err(); rowErr != nil {
 			slog.Warn("contributors fetch failed",

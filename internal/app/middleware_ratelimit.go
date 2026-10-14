@@ -70,8 +70,19 @@ func rateLimitMiddleware() gin.HandlerFunc {
 	go rateLimiters.cleanupStale(1*time.Minute, 5*time.Minute)
 
 	return func(c *gin.Context) {
-		// Healthcheck gürültüsünü engelle (RequestLogger ile aynı liste)
-		if skipPaths[c.Request.URL.Path] {
+		// Ucuz healthcheck'leri (sadece /ping) rate limit'ten muaf tut.
+		if skipRateLimitPaths[c.Request.URL.Path] {
+			c.Next()
+			return
+		}
+
+		// CORS preflight isteklerini rate limit'e dahil etme.
+		// Tarayıcı preflight'ları kısa sürede birden fazla kez atabilir;
+		// 429 dönerse asıl istek hiç gönderilmez ve frontend kırılır.
+		// OPTIONS isteği gövdesiz ve zararsızdır, ayrıca rate limit
+		// topolojisinde CORS middleware bu middleware'den SONRA çalıştığı
+		// için preflight'a CORS header'ı eklenemez → tarayıcı reddeder.
+		if c.Request.Method == http.MethodOptions {
 			c.Next()
 			return
 		}

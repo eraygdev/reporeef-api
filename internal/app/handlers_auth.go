@@ -26,6 +26,16 @@ func handleGithubCallback(c *gin.Context) {
 	ctx := c.Request.Context()
 	code := c.Query("code")
 	state := c.Query("state")
+	errParam := c.Query("error")
+
+	// Kullanıcı GitHub authorize ekranında "Cancel" derse:
+	// ?error=access_denied&state=... ile döner. State'i tüketip login'e yönlendir.
+	if errParam != "" {
+		consumeOAuthState(state)
+		frontend := os.Getenv("FRONTEND_URL")
+		c.Redirect(http.StatusTemporaryRedirect, frontend+"/login?error="+errParam)
+		return
+	}
 
 	if !consumeOAuthState(state) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_state"})

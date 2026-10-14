@@ -257,29 +257,35 @@ func TestIsValidUsernameFormat(t *testing.T) {
 func TestIsAlnum(t *testing.T) {
 	tests := []struct {
 		name string
-		b    byte
+		r    rune
 		want bool
 	}{
-		{name: "a", b: 'a', want: true},
-		{name: "z", b: 'z', want: true},
-		{name: "A", b: 'A', want: true},
-		{name: "Z", b: 'Z', want: true},
-		{name: "0", b: '0', want: true},
-		{name: "9", b: '9', want: true},
-		{name: "nokta", b: '.', want: false},
-		{name: "alt çizgi", b: '_', want: false},
-		{name: "tire", b: '-', want: false},
-		{name: "boşluk", b: ' ', want: false},
-		{name: "0x80 (utf-8 devam)", b: 0x80, want: true},
-		{name: "0xC3 (ç/ş başlangıç)", b: 0xC3, want: true},
-		{name: "0xFF", b: 0xFF, want: true},
+		{name: "a", r: 'a', want: true},
+		{name: "z", r: 'z', want: true},
+		{name: "A", r: 'A', want: true},
+		{name: "Z", r: 'Z', want: true},
+		{name: "0", r: '0', want: true},
+		{name: "9", r: '9', want: true},
+		{name: "nokta", r: '.', want: false},
+		{name: "alt çizgi", r: '_', want: false},
+		{name: "tire", r: '-', want: false},
+		{name: "boşluk", r: ' ', want: false},
+		{name: "ç", r: 'ç', want: true},
+		{name: "ğ", r: 'ğ', want: true},
+		{name: "ı", r: 'ı', want: true},
+		{name: "İ", r: 'İ', want: true},
+		{name: "ö", r: 'ö', want: true},
+		{name: "ş", r: 'ş', want: true},
+		{name: "ü", r: 'ü', want: true},
+		{name: "emoji", r: '😀', want: false},
+		{name: "0x80 (byte değil)", r: 0x80, want: false},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := isAlnum(tc.b)
+			got := isAlnum(tc.r)
 			if got != tc.want {
-				t.Errorf("isAlnum(%d) = %v, want %v", tc.b, got, tc.want)
+				t.Errorf("isAlnum(%d) = %v, want %v", tc.r, got, tc.want)
 			}
 		})
 	}

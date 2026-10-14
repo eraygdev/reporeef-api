@@ -76,7 +76,7 @@ logs-cf-t:
 	gnome-terminal --tab --title="RepoReef - Cloudflared Logs" -- bash -c "cd $(PWD) && docker compose logs -f --tail 20 cloudflared; exec bash"
 
 logs-all:
-	docker compose logs -f --tail 20 backend cloudflared
+	docker compose logs --no-log-prefix -f --tail 20 backend cloudflared | python3 scripts/pretty-logs.py
 
 logs-all-t:
 	gnome-terminal --tab --title="RepoReef - All Logs" -- bash -c "cd $(PWD) && docker compose logs -f --tail 20 backend cloudflared; exec bash"
@@ -181,7 +181,7 @@ clean-docker: ## Docker build cache + unused image/volume temizle
 # ═══════════════════════════════════════════════════════════
 
 migrate-up:      ## Bekleyen migration'ları uygula
-	@migrate -path migrations -database "$(DATABASE_URL)" up
+	@migrate -path migrations -database "$(or $(MIGRATE_DATABASE_URL),$(DATABASE_URL))" up
 
 migrate-down:    ## Son migration'ı geri al
 	@migrate -path migrations -database "$(DATABASE_URL)" down 1

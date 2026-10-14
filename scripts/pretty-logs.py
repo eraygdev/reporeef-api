@@ -31,6 +31,12 @@ LEVELS = {
     "ERROR": RED("ERROR"),
 }
 
+# Servis etiketleri — JSON log'daki "service" alanını gösterir.
+# Kısa tutulur, her satırda tekrar ettiği için görsel ağırlığı az olmalı.
+SERVICE_TAGS = {
+    "backend": MAGENTA("[be]"),
+}
+
 
 def status_colored(code):
     if code >= 500:
@@ -42,6 +48,15 @@ def status_colored(code):
     return str(code)
 
 
+def service_tag(d):
+    """JSON log'dan kısa servis etiketi üretir. Yoksa boş string."""
+    svc = d.get("service")
+    if not svc:
+        return ""
+    tag = SERVICE_TAGS.get(svc, DIM(f"[{svc}]"))
+    return tag + " "
+
+
 for line in sys.stdin:
     line = line.strip()
     if not line:
@@ -50,11 +65,14 @@ for line in sys.stdin:
     try:
         d = json.loads(line)
     except json.JSONDecodeError:
-        print(line, flush=True)
+        # JSON değil — muhtemelen cloudflared plain-text log'u.
+        # Ayırt edilebilmesi için [cf] etiketi ekle.
+        print(f"{MAGENTA('[cf]')} {line}", flush=True)
         continue
 
     t = d.get("time", "?")[11:19]
     lvl = LEVELS.get(d.get("level", ""), d.get("level", "?"))
+    svc = service_tag(d)
 
     if d.get("method"):
         method = CYAN(d["method"].ljust(7))
@@ -64,7 +82,7 @@ for line in sys.stdin:
             3 + 9
         )  # ANSI kodları ~9 karakter
         duration = DIM(f"{d.get('duration_ms', 0)}ms".rjust(8))
-        out = f"{DIM(t)} {lvl} {method} {path} {status} {duration}"
+        out = f"{svc}{DIM(t)} {lvl} {method} {path} {status} {duration}"
         if d.get("ip"):
             out += f" {DIM('ip=' + str(d['ip']))}"
         if d.get("user_id"):
@@ -75,7 +93,7 @@ for line in sys.stdin:
             out += f" {RED(d['err'])}"
     else:
         msg = WHITE(d.get("msg", "?"))
-        out = f"{DIM(t)} {lvl} {msg}"
+        out = f"{svc}{DIM(t)} {lvl} {msg}"
         if d.get("repo"):
             out += f" {BLUE(d['repo'])}"
         if d.get("addr"):

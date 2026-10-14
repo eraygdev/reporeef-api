@@ -13,8 +13,16 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// handlePing sağlık kontrolü — DB bağlantısını da doğrular.
+// handlePing — liveness probe. DB'ye vurmaz, ucuz.
+// Rate limit dışı (skipRateLimitPaths). Docker healthcheck + uptime
+// monitor buraya bakar. DB kontrolü istiyorsan /ready kullan.
 func handlePing(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// handleReady — readiness probe. DB bağlantısını doğrular.
+// Rate limit altında — DB'ye vuruyor, flood'a kapalı olmalı.
+func handleReady(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 	defer cancel()
 
@@ -129,7 +137,8 @@ func handleUpdateMe(c *gin.Context) {
 		return
 	}
 
-	// Sadece username gerçekten değişiyorsa cooldown kontrolü
+	// Sadece username gerçekten değişiyorsa cooldown kontrolü.
+	// Bu ön kontrol hızlı fail içindir; atomik kontrol UPDATE WHERE'de.
 	usernameChanged := currentUsername != input.Username
 	if usernameChanged && !canChangeUsername(lastChangedAt, time.Now()) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "username_change_too_frequent"})
@@ -139,6 +148,9 @@ func handleUpdateMe(c *gin.Context) {
 	// onboarded=true — kullanıcı onboarding'i geçti (veya zaten geçmişti)
 	// is_premium'u da döndür ki yeni JWT üretebilelim.
 	// username_changed_at SADECE gerçekten değiştiyse güncellenir.
+	//
+	// Cooldown atomik: WHERE'de tekrar kontrol edilir. Eşzamanlı iki istek
+	// gelirse biri RowsAffected=0 alır → 429 döner (TOCTOU yok).
 	var isPremium bool
 
 	if usernameChanged {
@@ -149,8 +161,17 @@ func handleUpdateMe(c *gin.Context) {
 			    onboarded = true,
 			    username_changed_at = NOW()
 			WHERE id = $3
+			  AND (username_changed_at IS NULL
+			       OR username_changed_at < NOW() - INTERVAL '48 hours')
 			RETURNING is_premium
 		`, input.Username, input.Bio, userID).Scan(&isPremium)
+
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Kullanıcı var ama cooldown aktif → 429.
+			// (Kullanıcı yok senaryosu yukarıdaki SELECT'te yakalandı.)
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "username_change_too_frequent"})
+			return
+		}
 	} else {
 		err = db.QueryRow(ctx, `
 			UPDATE users

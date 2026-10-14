@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/eraygdev/reporeef-api/internal/profanity"
@@ -200,9 +201,11 @@ func isValidUsernameFormat(username string) bool {
 		return false
 	}
 
-	// Baş/son karakterler harf veya rakam olmalı
-	first := username[0]
-	last := username[len(username)-1]
+	// Baş/son karakterler harf veya rakam olmalı.
+	// Rune bazlı: "çağrı" gibi Türkçe karakterli isimlerde son rune kontrol edilir.
+	runes := []rune(username)
+	first := runes[0]
+	last := runes[len(runes)-1]
 	if !isAlnum(first) || !isAlnum(last) {
 		return false
 	}
@@ -217,13 +220,10 @@ func isValidUsernameFormat(username string) bool {
 	return true
 }
 
-// isAlnum — ASCII harf veya rakam mı?
-// Türkçe karakterleri de kabul eder (byte bazlı kontrol yerine rune).
-func isAlnum(b byte) bool {
-	return (b >= 'a' && b <= 'z') ||
-		(b >= 'A' && b <= 'Z') ||
-		(b >= '0' && b <= '9') ||
-		b >= 0x80 // UTF-8 continuation / Türkçe karakter başlangıcı
+// isAlnum — Unicode harf veya rakam mı?
+// Türkçe karakterler (ç, ğ, ı, İ, ö, ş, ü) unicode.IsLetter kapsamındadır.
+func isAlnum(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r)
 }
 
 // validateProfileInput — kullanıcı profil güncellemesi için username + bio validasyonu.

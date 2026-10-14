@@ -50,11 +50,13 @@ func NewRouter() *gin.Engine {
 	}
 
 	router.Use(rateLimitMiddleware())
+	router.Use(maxBodySizeMiddleware(MaxRequestBodyBytes))
 	router.Use(securityHeadersMiddleware())
 
 	setupCORS(router)
 
 	router.GET("/ping", handlePing)
+	router.GET("/ready", handleReady)
 
 	api := router.Group("/api/" + APIVersion)
 

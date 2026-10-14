@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log/slog"
+	"math/rand/v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,11 +33,24 @@ func main() {
 			Environment:      os.Getenv("ENV"),
 			Release:          "reporeef-api@1.0.0",
 			TracesSampleRate: 0.1, // 10% tracing sample
+			// BeforeSend — quota koruması.
+			// Bir saldırgan veya bug loop'u aynı hatayı binlerce kez
+			// tetiklerse 5K/ay ücretsiz kotamız hızla dolar ve
+			// gerçek hataları göremez oluruz. Event'lerin %20'sini
+			// gönder, %80'ini düşür. Normal prod'da 500 sayısı çok
+			// düşük olduğu için görünürlük kaybı yok; flood durumunda
+			// hayat kurtarır.
+			BeforeSend: func(event *sentry.Event, hint *sentry.EventHint) *sentry.Event {
+				if rand.Float64() < 0.8 {
+					return nil // drop
+				}
+				return event
+			},
 		})
 		if err != nil {
 			slog.Error("sentry initialization failed", "err", err)
 		} else {
-			slog.Info("sentry initialized")
+			slog.Info("sentry initialized", "sampling", "0.2")
 			defer sentry.Flush(2 * time.Second)
 		}
 	} else {

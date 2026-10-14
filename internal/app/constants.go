@@ -51,6 +51,11 @@ const (
 	MaxSearchLen = 100
 )
 
+// Request body limitleri — DoS koruması.
+// En büyük payload (bio + longDesc + contributor message) toplamı <10KB.
+// 1MB rahat bir üst sınır, bolca headroom bırakır.
+const MaxRequestBodyBytes = 1 << 20 // 1 MB
+
 // Sayfalama limitleri
 const (
 	MaxProjectsPerPage = 20
