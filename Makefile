@@ -12,7 +12,7 @@ help:
 	@echo "  rebuild        Kod degisti, yeniden derle"
 	@echo ""
 	@echo "  ── LOGS (bu terminal) ──"
-	@echo "  logs           Backend loglari"
+	@echo "  logs           Backend loglari (tek satir, renkli degil)"
 	@echo "  logs-cf        Cloudflared loglari"
 	@echo "  logs-all       Tum loglar"
 	@echo ""
@@ -64,7 +64,7 @@ down:
 # ═══════════════════════════════════════════════════════════
 
 logs:
-	docker compose logs -f --tail 20 backend
+	@docker compose logs --no-log-prefix -f --tail 20 backend | python3 scripts/pretty-logs.py
 
 logs-t:
 	gnome-terminal --tab --title="RepoReef - Backend Logs" -- bash -c "cd $(PWD) && docker compose logs -f --tail 20 backend; exec bash"
