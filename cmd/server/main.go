@@ -50,6 +50,9 @@ func main() {
 	// OAuth state cleanup — süresi geçmiş state'leri temizler
 	go app.StartOAuthCleanup()
 
+	// GitHub repo cache cleanup — expired entry'leri temizler
+	go app.StartRepoCacheCleanup()
+
 	router := app.NewRouter()
 
 	port := os.Getenv("PORT")

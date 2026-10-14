@@ -339,8 +339,8 @@ func handleCreateProject(c *gin.Context) {
 	}
 	input = cleaned
 
-	// HTTP: GitHub repo public mi?
-	if err := checkGithubRepoPublic(input.GithubURL); err != nil {
+	// HTTP: GitHub repo public mi? (cache'li)
+	if err := checkGithubRepoPublicCached(input.GithubURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -642,8 +642,8 @@ func handleUpdateProject(c *gin.Context) {
 	}
 	input = cleaned
 
-	// HTTP: GitHub repo public mi?
-	if err := checkGithubRepoPublic(input.GithubURL); err != nil {
+	// HTTP: GitHub repo public mi? (cache'li)
+	if err := checkGithubRepoPublicCached(input.GithubURL); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
