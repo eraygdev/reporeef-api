@@ -61,7 +61,7 @@ func handleListProjects(c *gin.Context) {
 	}
 
 	matchMode := c.DefaultQuery("mode", "or")
-	sortParam := c.DefaultQuery("sort", "popular")
+	sortParam := c.DefaultQuery("sort", "hot")
 	conditions := []string{}
 	args := []interface{}{userID}
 	argIdx := 2
@@ -240,8 +240,7 @@ func handleGetProject(c *gin.Context) {
 		Stars            int                      `json:"stars"`
 		Starred          bool                     `json:"starred"`
 		Contributors     int                      `json:"contributors"`
-		MaxContributors  int                      `json:"maxContributors"` // [YENİ]
-		Status           string                   `json:"status"`
+		MaxContributors  int                      `json:"maxContributors"`
 		CreatedAt        time.Time                `json:"createdAt"`
 		Author           string                   `json:"author"`
 		AuthorAvatar     string                   `json:"authorAvatar"`
@@ -262,7 +261,7 @@ func handleGetProject(c *gin.Context) {
 			EXISTS(SELECT 1 FROM project_stars WHERE project_id = p.id AND user_id = $2) AS starred,
 			(SELECT COUNT(*) FROM project_contributors WHERE project_id = p.id AND status = 'approved') AS contributors,
 			p.max_contributors,
-			p.status, p.created_at,
+			p.created_at,
 			COALESCE(u.username, '') AS author,
 			COALESCE(u.avatar_url, '') AS author_avatar,
 			COALESCE(u.id, 0) AS author_id,
@@ -274,7 +273,7 @@ func handleGetProject(c *gin.Context) {
 	`, id, userID).Scan(
 		&project.ID, &project.Title, &project.Description, &project.LongDescription,
 		&project.GithubURL, &project.DemoURL, &project.ImageURL,
-		&project.Stars, &project.Starred, &project.Contributors, &project.MaxContributors, &project.Status, &project.CreatedAt,
+		&project.Stars, &project.Starred, &project.Contributors, &project.MaxContributors, &project.CreatedAt,
 		&project.Author, &project.AuthorAvatar, &project.AuthorID,
 		&project.Categories, &project.CategoryIDs,
 	)
