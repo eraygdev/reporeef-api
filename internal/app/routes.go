@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	sentrygin "github.com/getsentry/sentry-go/gin"
 	"github.com/gin-contrib/cors"
@@ -150,5 +151,6 @@ func setupCORS(router *gin.Engine) {
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
 		AllowCredentials: false,
+		MaxAge:           10 * time.Minute, // Preflight cache — tarayıcı 10 dk boyunca tekrar sormaz
 	}))
 }

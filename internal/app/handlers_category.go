@@ -8,8 +8,18 @@ import (
 )
 
 // handleListCategories tüm kategorileri alfabetik döner.
+//
+// 5 dk in-memory cache — kategoriler statik veri. Cache hit olduğunda
+// DB'ye hiç gidilmez. Cache miss olduğunda DB'den çekilir ve cache yazılır.
 func handleListCategories(c *gin.Context) {
-	rows, err := db.Query(c.Request.Context(), `
+	// Cache hit — direkt dön
+	if cached, ok := getCachedCategories(); ok {
+		c.JSON(http.StatusOK, cached)
+		return
+	}
+
+	// Cache miss — DB'den çek (circuit breaker ile sarmalı)
+	rows, err := queryCB(c.Request.Context(), `
 		SELECT id, name, slug FROM categories ORDER BY name ASC
 	`)
 	if err != nil {
@@ -39,6 +49,9 @@ func handleListCategories(c *gin.Context) {
 		serverError(c, err, "")
 		return
 	}
+
+	// Cache'e yaz — sonraki 5 dk için
+	setCachedCategories(categories)
 
 	c.JSON(http.StatusOK, categories)
 }
