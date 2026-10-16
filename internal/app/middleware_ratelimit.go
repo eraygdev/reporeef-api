@@ -71,10 +71,10 @@ func rateLimitMiddleware() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		// Ucuz healthcheck'leri (sadece /ping) rate limit'ten muaf tut.
-		if skipRateLimitPaths[c.Request.URL.Path] {
-			c.Next()
-			return
-		}
+		//if skipRateLimitPaths[c.Request.URL.Path] {
+		//	c.Next()
+		//	return
+		//}
 
 		// CORS preflight isteklerini rate limit'e dahil etme.
 		// Tarayıcı preflight'ları kısa sürede birden fazla kez atabilir;

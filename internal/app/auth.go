@@ -20,8 +20,8 @@ import (
 var (
 	githubOauthConfig *oauth2.Config
 	jwtSecret         []byte
+	jwtSecretPrevious []byte // Rotasyon sırasında eski token'ları doğrulamak için
 
-	// stateStore — geçici OAuth state'lerini tutar (CSRF koruması)
 	stateStore   = make(map[string]time.Time)
 	stateStoreMu sync.Mutex
 )
@@ -73,6 +73,17 @@ func InitOAuth() {
 		slog.Error("JWT_SECRET environment variable is not set")
 		os.Exit(1)
 	}
+
+	// Opsiyonel: rotasyon sırasında eski secret'ı da yükle.
+	// Rotasyon adımları:
+	//   1. JWT_SECRET_PREVIOUS = eski secret (bu sürümle deploy)
+	//   2. Yeni token'lar yeni secret'la üretilir
+	//   3. 7 gün (token TTL) sonra JWT_SECRET_PREVIOUS'ı sil
+	if prev := os.Getenv("JWT_SECRET_PREVIOUS"); prev != "" {
+		jwtSecretPrevious = []byte(prev)
+		slog.Info("jwt rotation active", "previous_secret_loaded", true)
+	}
+
 	githubOauthConfig = &oauth2.Config{
 		ClientID:     os.Getenv("GITHUB_CLIENT_ID"),
 		ClientSecret: os.Getenv("GITHUB_CLIENT_SECRET"),
@@ -123,6 +134,17 @@ func authMiddleware() gin.HandlerFunc {
 			}
 			return jwtSecret, nil
 		})
+
+		// Rotasyon sırasında: yeni secret başarısızsa eski secret'ı dene
+		if (err != nil || !token.Valid) && len(jwtSecretPrevious) > 0 {
+			token, err = jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+				if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
+					return nil, fmt.Errorf("unexpected signing method")
+				}
+				return jwtSecretPrevious, nil
+			})
+		}
+
 		if err != nil || !token.Valid {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid_token"})
 			c.Abort()

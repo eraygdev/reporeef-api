@@ -26,9 +26,9 @@ var skipLogPaths = map[string]bool{
 // skipRateLimitPaths — rate limit dışı bırakılacak path'ler.
 // Sadece /ping: DB'ye vurmaz, ucuz, her healthcheck için gerekli.
 // /ready burada DEĞİL — DB'ye vuruyor, rate limit altında kalmalı.
-var skipRateLimitPaths = map[string]bool{
-	"/ping": true,
-}
+//var skipRateLimitPaths = map[string]bool{
+//	"/ping": true,
+//}
 
 // InitLogger — slog'u başlatır.
 //   - production: JSON (Loki/Datadog/CloudWatch uyumlu)

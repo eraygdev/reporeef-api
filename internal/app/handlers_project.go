@@ -256,7 +256,7 @@ func handleGetProject(c *gin.Context) {
 		ContributorsList []map[string]interface{} `json:"contributorsList"`
 	}
 
-	err = db.QueryRow(ctx, `
+	err = queryRowCB(ctx, `
 		SELECT 
 			p.id, p.title, p.description,
 			COALESCE(p.long_description, '') AS long_description,
@@ -296,7 +296,7 @@ func handleGetProject(c *gin.Context) {
 		project.CategoryIDs = []int{}
 	}
 
-	contribRows, err := db.Query(ctx, `
+	contribRows, err := queryCB(ctx, `
 		SELECT u.id AS user_id, u.username, COALESCE(u.avatar_url, '') AS avatar_url
 		FROM project_contributors pc
 		JOIN users u ON u.id = pc.user_id

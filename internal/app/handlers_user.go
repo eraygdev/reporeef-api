@@ -26,7 +26,7 @@ func handleReady(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
 	defer cancel()
 
-	if err := db.Ping(ctx); err != nil {
+	if err := pingCB(ctx); err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{
 			"status": "unhealthy",
 			"db":     "down",
@@ -54,7 +54,7 @@ func handleMe(c *gin.Context) {
 		onboarded      bool
 	)
 
-	err := db.QueryRow(c.Request.Context(), `
+	err := queryRowCB(c.Request.Context(), `
 		SELECT email, COALESCE(username, ''), COALESCE(github_username, ''),
 		       COALESCE(avatar_url, ''), COALESCE(bio, ''), is_premium, onboarded
 		FROM users WHERE id = $1
@@ -240,17 +240,19 @@ func handleGetUserByUsername(c *gin.Context) {
 	sortParam := c.DefaultQuery("sort", "newest")
 
 	var (
-		userID     int
-		dbUsername string
-		avatarURL  string
-		bio        string
-		createdAt  time.Time
+		userID         int
+		dbUsername     string
+		githubUsername string
+		avatarURL      string
+		bio            string
+		createdAt      time.Time
 	)
 
 	err := db.QueryRow(ctx, `
-    SELECT id, username, COALESCE(avatar_url, ''), COALESCE(bio, ''), created_at
+    SELECT id, username, COALESCE(github_username, ''),
+           COALESCE(avatar_url, ''), COALESCE(bio, ''), created_at
     FROM users WHERE LOWER(username) = LOWER($1)
-`, username).Scan(&userID, &dbUsername, &avatarURL, &bio, &createdAt)
+`, username).Scan(&userID, &dbUsername, &githubUsername, &avatarURL, &bio, &createdAt)
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "user_not_found"})
@@ -342,11 +344,12 @@ func handleGetUserByUsername(c *gin.Context) {
 	hasMore := count > limit
 
 	c.JSON(http.StatusOK, gin.H{
-		"user_id":    userID,
-		"username":   dbUsername,
-		"avatar_url": avatarURL,
-		"bio":        bio,
-		"created_at": createdAt,
+		"user_id":         userID,
+		"username":        dbUsername,
+		"github_username": githubUsername,
+		"avatar_url":      avatarURL,
+		"bio":             bio,
+		"created_at":      createdAt,
 		"stats": gin.H{
 			"totalProjects":     totalProjects,
 			"totalStars":        totalStars,

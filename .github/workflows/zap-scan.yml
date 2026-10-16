@@ -1,0 +1,17 @@
+name: DAST — OWASP ZAP
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # Her pazartesi 03:00 UTC
+  workflow_dispatch: # Elle tetikleme
+
+jobs:
+  zap-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ZAP Baseline Scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "https://api.reporeef.com"
+          rules_file_name: ".zap/rules.tsv"
+          cmd_options: "-a"
