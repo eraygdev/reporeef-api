@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [main]
 
+# CodeQL'in güvenlik raporlarını yükleyebilmesi için gerekli izinler
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -39,6 +44,6 @@ jobs:
           args: "-no-fail -fmt sarif -out results.sarif ./..."
 
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: results.sarif
