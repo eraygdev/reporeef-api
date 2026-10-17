@@ -19,8 +19,9 @@ var logger *slog.Logger
 // /ping ucuz ve sık çağrılır → log yok.
 // /ready DB'ye vurur ama hâlâ healthcheck → log yok.
 var skipLogPaths = map[string]bool{
-	"/ping":  true,
-	"/ready": true,
+	"/ping":        true,
+	"/ready":       true,
+	"/favicon.ico": true,
 }
 
 // skipRateLimitPaths — rate limit dışı bırakılacak path'ler.

@@ -2,6 +2,7 @@ package app
 
 import (
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -60,6 +61,13 @@ func NewRouter() *gin.Engine {
 	router.GET("/ready", handleReady)
 	router.GET("/sitemap.xml", handleSitemap)
 	router.HEAD("/sitemap.xml", handleSitemap) // Dinamik sitemap
+	router.GET("/robots.txt", handleRobotsAPI)
+
+	// API alt alan adında favicon istenirse 204 dön.
+	// Tarayıcılar/botlar otomatik arar, 404 log kirliliği yaratır.
+	router.GET("/favicon.ico", func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
 
 	api := router.Group("/api/" + APIVersion)
 
