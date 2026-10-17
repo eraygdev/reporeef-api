@@ -58,6 +58,8 @@ func NewRouter() *gin.Engine {
 
 	router.GET("/ping", handlePing)
 	router.GET("/ready", handleReady)
+	router.GET("/sitemap.xml", handleSitemap)
+	router.HEAD("/sitemap.xml", handleSitemap) // Dinamik sitemap
 
 	api := router.Group("/api/" + APIVersion)
 
