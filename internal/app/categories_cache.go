@@ -10,7 +10,7 @@ import (
 // Kategoriler statik veri (yılda 2-3 kez değişir). Her istekte DB'ye
 // gitmek israf — 5 dk TTL ile ~30-40 DB çağrısı/saat tasarruf ediyoruz.
 //
-// Concurrency: sync.RWMutex ile korunuyor. Get çağrıları paralel,
+// Concurrency: sync.RWMutex ile korunuyor. Get çağrıları eşzamanlı,
 // Set çağrıları seri.
 type categoryCacheStore struct {
 	mu        sync.RWMutex

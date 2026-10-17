@@ -165,6 +165,8 @@ clean-docker: ## Docker build cache + unused image/volume temizle
 	@echo ""
 	@echo "Önce:"
 	@docker system df
+	@echo -n "Toplam Disk Kullanımı: "
+	@docker system df --format '{{.Size}}' | awk '{val=$$1; if(val ~ /GB/){gsub(/GB/,"",val); t+=val*1073741824} else if(val ~ /MB/){gsub(/MB/,"",val); t+=val*1048576} else if(val ~ /kB/){gsub(/kB/,"",val); t+=val*1024} else if(val ~ /B/){gsub(/B/,"",val); t+=val}} END {if(t>=1073741824) printf "%.2f GB\n", t/1073741824; else if(t>=1048576) printf "%.2f MB\n", t/1048576; else printf "%.2f KB\n", t/1024}'
 	@echo ""
 	docker builder prune -a -f
 	docker image prune -a -f
@@ -173,6 +175,8 @@ clean-docker: ## Docker build cache + unused image/volume temizle
 	@echo ""
 	@echo "Sonra:"
 	@docker system df
+	@echo -n "Toplam Disk Kullanımı: "
+	@docker system df --format '{{.Size}}' | awk '{val=$$1; if(val ~ /GB/){gsub(/GB/,"",val); t+=val*1073741824} else if(val ~ /MB/){gsub(/MB/,"",val); t+=val*1048576} else if(val ~ /kB/){gsub(/kB/,"",val); t+=val*1024} else if(val ~ /B/){gsub(/B/,"",val); t+=val}} END {if(t>=1073741824) printf "%.2f GB\n", t/1073741824; else if(t>=1048576) printf "%.2f MB\n", t/1048576; else printf "%.2f KB\n", t/1024}'
 	@echo ""
 	@echo "✔ Temizlik tamamlandı."
 

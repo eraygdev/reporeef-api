@@ -22,7 +22,7 @@ func checkGithubImageSize(imageURL string) error {
 	if err != nil {
 		return nil // fail-open
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// 200 değilse fail-open (404, 429 rate limit vb.)
 	if resp.StatusCode != http.StatusOK {

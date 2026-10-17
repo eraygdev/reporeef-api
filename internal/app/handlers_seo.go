@@ -127,10 +127,8 @@ func handleSitemap(c *gin.Context) {
 	c.Data(http.StatusOK, "application/xml; charset=utf-8", sitemapCache)
 }
 
-// handleRobotsAPI — api.reporeef.com için robots.txt.
-// API alt alan adı Google tarafından indekslenmemeli.
-// Tüm botlara "hiçbir şeyi tarama" der.
 func handleRobotsAPI(c *gin.Context) {
+	// Googlebot'un API'ye erişmesine izin ver
 	c.String(http.StatusOK, `User-agent: *
-Disallow: /`)
+Allow: /`)
 }

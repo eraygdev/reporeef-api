@@ -71,6 +71,13 @@ func NewRouter() *gin.Engine {
 
 	api := router.Group("/api/" + APIVersion)
 
+	// API yanıtlarının Google arama sonuçlarında indekslenmesini engelle
+	// Ama Googlebot'un sayfayı oluşturması için okumasına izin ver.
+	api.Use(func(c *gin.Context) {
+		c.Header("X-Robots-Tag", "noindex")
+		c.Next()
+	})
+
 	// Auth
 	auth := api.Group("/auth")
 	{

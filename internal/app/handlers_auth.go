@@ -59,7 +59,7 @@ func handleGithubCallback(c *gin.Context) {
 		serverError(c, err, "auth_failed")
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 	var info map[string]interface{}
@@ -90,7 +90,7 @@ func handleGithubCallback(c *gin.Context) {
 
 		emailResp, err := client.Do(emailReq)
 		if err == nil {
-			defer emailResp.Body.Close()
+			defer func() { _ = emailResp.Body.Close() }()
 			emailBody, _ := io.ReadAll(emailResp.Body)
 			var emails []map[string]interface{}
 			_ = json.Unmarshal(emailBody, &emails)

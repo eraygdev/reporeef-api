@@ -111,9 +111,10 @@ func handleListProjects(c *gin.Context) {
 
 	orderClause := "p.created_at DESC, p.id DESC" // default: newest
 
-	if sortParam == "popular" {
+	switch sortParam {
+	case "popular":
 		orderClause = "COALESCE(s.stars, 0) DESC, p.created_at DESC, p.id DESC"
-	} else if sortParam == "trending" {
+	case "trending":
 		orderClause = `
 			(SELECT COUNT(*) FROM project_stars
 			 WHERE project_id = p.id
@@ -122,7 +123,7 @@ func handleListProjects(c *gin.Context) {
 			p.created_at DESC,
 			p.id DESC
 		`
-	} else if sortParam == "hot" {
+	case "hot":
 		orderClause = `
 			(COALESCE(s.stars, 0) * 1.0 + COALESCE(c.contributors, 0) * 3.0 + 1)
 			/ POWER(EXTRACT(EPOCH FROM (NOW() - p.created_at)) / 3600.0 + 24, 1.5)
