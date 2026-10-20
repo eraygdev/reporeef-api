@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
@@ -165,6 +166,7 @@ func authMiddleware() gin.HandlerFunc {
 			return
 		}
 		c.Set("user_id", int(uid))
+		go touchLastSeenAsync(int(uid))
 
 		// Eski token'larda onboarded claim'i yok — migration öncesi
 		// üretilmiş token'lar için true varsay (mevcutlar zaten onboarded).
@@ -212,6 +214,7 @@ func authMiddlewareOptional() gin.HandlerFunc {
 
 		if uid, ok := claims["user_id"].(float64); ok {
 			c.Set("user_id", int(uid))
+			go touchLastSeenAsync(int(uid))
 		} else {
 			c.Set("user_id", 0)
 		}
@@ -241,5 +244,26 @@ func requireOnboarded() gin.HandlerFunc {
 			return
 		}
 		c.Next()
+	}
+}
+
+// touchLastSeenAsync — users.last_seen_at'i async günceller.
+// 5 dk throttle: son 5 dk içinde güncellendiyse DB yazması yapmaz.
+// Fire-and-forget: hata olsa bile isteği engellemez.
+func touchLastSeenAsync(userID int) {
+	if userID <= 0 {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err := execCB(ctx, `
+		UPDATE users SET last_seen_at = NOW()
+		WHERE id = $1
+		  AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL '5 minutes')
+	`, userID)
+	if err != nil {
+		slog.Warn("touchLastSeen failed", "user_id", userID, "err", err)
 	}
 }

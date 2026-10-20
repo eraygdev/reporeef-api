@@ -101,6 +101,9 @@ func NewRouter() *gin.Engine {
 		projects.POST("/:id/join", authMiddleware(), requireOnboarded(), handleJoinProject)
 		projects.DELETE("/:id/leave", authMiddleware(), requireOnboarded(), handleLeaveProject)
 		projects.GET("/:id/my-join-status", authMiddleware(), handleMyJoinStatus)
+		projects.GET("/:id/contributors", authMiddleware(), handleProjectContributors)
+		projects.PUT("/:id/contributors/settings", authMiddleware(), requireOnboarded(), handleUpdateProjectSettings)
+		projects.DELETE("/:id/contributors/:userId", authMiddleware(), handleRemoveContributor)
 		projects.DELETE("/:id/contributors/:userId", authMiddleware(), handleRemoveContributor)
 	}
 
