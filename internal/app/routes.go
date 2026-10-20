@@ -104,7 +104,6 @@ func NewRouter() *gin.Engine {
 		projects.GET("/:id/contributors", authMiddleware(), handleProjectContributors)
 		projects.PUT("/:id/contributors/settings", authMiddleware(), requireOnboarded(), handleUpdateProjectSettings)
 		projects.DELETE("/:id/contributors/:userId", authMiddleware(), handleRemoveContributor)
-		projects.DELETE("/:id/contributors/:userId", authMiddleware(), handleRemoveContributor)
 	}
 
 	// Me — kendi kaynaklarım

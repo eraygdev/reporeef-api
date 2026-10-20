@@ -248,7 +248,8 @@ func requireOnboarded() gin.HandlerFunc {
 }
 
 // touchLastSeenAsync — users.last_seen_at'i async günceller.
-// 5 dk throttle: son 5 dk içinde güncellendiyse DB yazması yapmaz.
+// 6 saat throttle: son 6 saat içinde güncellendiyse DB yazması yapmaz.
+// Gün seviyesinde gösterim için yeterli, DB yazma yükü minimum.
 // Fire-and-forget: hata olsa bile isteği engellemez.
 func touchLastSeenAsync(userID int) {
 	if userID <= 0 {
@@ -261,7 +262,7 @@ func touchLastSeenAsync(userID int) {
 	_, err := execCB(ctx, `
 		UPDATE users SET last_seen_at = NOW()
 		WHERE id = $1
-		  AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL '5 minutes')
+		  AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL '6 hours')
 	`, userID)
 	if err != nil {
 		slog.Warn("touchLastSeen failed", "user_id", userID, "err", err)
