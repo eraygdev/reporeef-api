@@ -28,7 +28,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: reporeef-cloudflared
     restart: unless-stopped
-    command: tunnel --no-autoupdate --loglevel warn run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --protocol http2 --loglevel warn run --token ${CLOUDFLARE_TUNNEL_TOKEN}
     env_file:
       - .env
     networks:

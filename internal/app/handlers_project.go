@@ -249,6 +249,7 @@ func handleGetProject(c *gin.Context) {
 		Contributors     int                      `json:"contributors"`
 		MaxContributors  int                      `json:"maxContributors"`
 		CreatedAt        time.Time                `json:"createdAt"`
+		UpdatedAt        time.Time                `json:"updatedAt"`
 		Author           string                   `json:"author"`
 		AuthorAvatar     string                   `json:"authorAvatar"`
 		AuthorID         int                      `json:"authorId"`
@@ -269,6 +270,7 @@ func handleGetProject(c *gin.Context) {
 			(SELECT COUNT(*) FROM project_contributors WHERE project_id = p.id AND status = 'approved') AS contributors,
 			p.max_contributors,
 			p.created_at,
+			p.updated_at,
 			COALESCE(u.username, '') AS author,
 			COALESCE(u.avatar_url, '') AS author_avatar,
 			COALESCE(u.id, 0) AS author_id,
@@ -280,7 +282,7 @@ func handleGetProject(c *gin.Context) {
 	`, id, userID).Scan(
 		&project.ID, &project.Title, &project.Description, &project.LongDescription,
 		&project.GithubURL, &project.DemoURL, &project.ImageURL,
-		&project.Stars, &project.Starred, &project.Contributors, &project.MaxContributors, &project.CreatedAt,
+		&project.Stars, &project.Starred, &project.Contributors, &project.MaxContributors, &project.CreatedAt, &project.UpdatedAt,
 		&project.Author, &project.AuthorAvatar, &project.AuthorID,
 		&project.Categories, &project.CategoryIDs,
 	)
@@ -696,8 +698,7 @@ func handleUpdateProject(c *gin.Context) {
 	_, err = tx.Exec(ctx, `
 		UPDATE projects
 		SET title = $1, description = $2, long_description = $3,
-		    github_url = $4, demo_url = $5, image_url = $6,
-		    updated_at = NOW()
+		    github_url = $4, demo_url = $5, image_url = $6
 		WHERE id = $7
 	`, input.Title, input.Description, input.LongDescription,
 		input.GithubURL, input.DemoURL, input.ImageURL, projectID)

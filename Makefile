@@ -188,13 +188,13 @@ migrate-up:      ## Bekleyen migration'ları uygula
 	@migrate -path migrations -database "$(or $(MIGRATE_DATABASE_URL),$(DATABASE_URL))" up
 
 migrate-down:    ## Son migration'ı geri al
-	@migrate -path migrations -database "$(DATABASE_URL)" down 1
+	@migrate -path migrations -database "$(or $(MIGRATE_DATABASE_URL),$(DATABASE_URL))" down 1
 
 migrate-version: ## Aktif migration sürümü
-	@migrate -path migrations -database "$(DATABASE_URL)" version
+	@migrate -path migrations -database "$(or $(MIGRATE_DATABASE_URL),$(DATABASE_URL))" version
 
 migrate-force:   ## Baseline (kullanım: make migrate-force V=2)
-	migrate -path migrations -database "$(DATABASE_URL)" force $(V)
+	migrate -path migrations -database "$(or $(MIGRATE_DATABASE_URL),$(DATABASE_URL))" force $(V)
 
 migrate-new:     ## Yeni migration (kullanım: make migrate-new NAME=add_foo)
 	@if [ -z "$(NAME)" ]; then echo "Kullanım: make migrate-new NAME=add_foo"; exit 1; fi
